@@ -1,0 +1,430 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum Visibility {
+  PRIVATE
+  UNLISTED
+  ORG
+  PUBLIC
+}
+
+enum RadarStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum ScanIntensity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum IntelligenceSourceType {
+  ARTICLE
+  GITHUB
+  SOCIAL
+  PAPER
+  VIDEO
+  NEWSLETTER
+  DOCUMENTATION
+  MANUAL
+}
+
+enum IntelligenceLifecycleStatus {
+  DISCOVERED
+  ANALYZED
+  TRACKING
+  ADOPTED
+  ARCHIVED
+  DORMANT
+  REACTIVATED
+}
+
+enum AnalysisStatus {
+  DRAFT
+  GENERATED
+  REVIEWED
+  APPROVED
+  SUPERSEDED
+}
+
+enum AnalysisType {
+  AI_GENERATED
+  HUMAN_AUTHORED
+  HYBRID
+}
+
+enum AnalysisSourceRelationType {
+  PRIMARY
+  SUPPORTING
+  CONTRADICTING
+  BACKGROUND
+}
+
+enum RecommendationActionType {
+  WATCH
+  VALIDATE_BY_POC
+  ADOPT_INCREMENTALLY
+  REJECT_FOR_NOW
+  NEED_MORE_INFO
+}
+
+enum RecommendationStatus {
+  OPEN
+  ACCEPTED
+  REJECTED
+  DONE
+}
+
+enum PriorityLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum PocStatus {
+  PLANNED
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum PocOutcome {
+  SUCCESS
+  PARTIAL
+  FAILED
+  INCONCLUSIVE
+}
+
+enum DailyReportStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum ActivityEntityType {
+  RADAR
+  INTELLIGENCE_ITEM
+  TECHNOLOGY_ANALYSIS
+  RECOMMENDATION
+  POC
+  DAILY_REPORT
+}
+
+enum ActivityActionType {
+  CREATED
+  UPDATED
+  STATUS_CHANGED
+  GENERATED
+  LINKED
+  UNLINKED
+  PUBLISHED
+  ARCHIVED
+}
+
+model User {
+  id             String     @id @default(cuid())
+  email          String     @unique
+  name           String
+  status         UserStatus @default(ACTIVE)
+  avatarUrl      String?
+  organizationId String?
+  timezone       String?
+  locale         String?
+  metadata       Json?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  ownedRadars             Radar[]              @relation("RadarOwner")
+  ownedIntelligenceItems  IntelligenceItem[]   @relation("IntelligenceItemOwner")
+  ownedTechnologyAnalyses TechnologyAnalysis[] @relation("TechnologyAnalysisOwner")
+  ownedRecommendations    Recommendation[]     @relation("RecommendationOwner")
+  ownedPocs               PoC[]                @relation("PoCOwner")
+  ownedDailyReports       DailyReport[]        @relation("DailyReportOwner")
+  ownedActivityLogs       ActivityLog[]        @relation("ActivityLogOwner")
+  actedActivityLogs       ActivityLog[]        @relation("ActivityLogActor")
+
+  @@index([organizationId])
+}
+
+model Radar {
+  id               String        @id @default(cuid())
+  ownerId          String
+  organizationId   String?
+  visibility       Visibility    @default(PRIVATE)
+  name             String
+  slug             String
+  description      String
+  status           RadarStatus   @default(DRAFT)
+  scanIntensity    ScanIntensity @default(MEDIUM)
+  isActive         Boolean       @default(true)
+  businessDomain   String?
+  focusQuestion    String?
+  observationScope String?
+  targetAudience   String?
+  summary          String?
+  decisionContext  String?
+  lastScannedAt    DateTime?
+  nextScanAt       DateTime?
+  metadata         Json?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  owner              User                 @relation("RadarOwner", fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  intelligenceItems  IntelligenceItem[]
+  technologyAnalyses TechnologyAnalysis[]
+  recommendations    Recommendation[]
+  pocs               PoC[]
+  dailyReports       DailyReport[]
+  activityLogs       ActivityLog[]
+
+  @@unique([ownerId, slug])
+  @@index([ownerId])
+  @@index([organizationId])
+  @@index([ownerId, isActive])
+  @@index([ownerId, status])
+}
+
+model IntelligenceItem {
+  id                String                      @id @default(cuid())
+  ownerId           String
+  radarId           String
+  organizationId    String?
+  visibility        Visibility                  @default(PRIVATE)
+  title             String
+  summary           String?
+  rawContent        String?
+  sourceType        IntelligenceSourceType
+  sourceUrl         String
+  sourceName        String?
+  sourceAuthor      String?
+  sourcePublishedAt DateTime?
+  technologyName    String?
+  vendor            String?
+  topic             String?
+  keywords          Json?
+  lifecycleStatus   IntelligenceLifecycleStatus @default(DISCOVERED)
+  capturedAt        DateTime?
+  metadata          Json?
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+
+  owner              User                @relation("IntelligenceItemOwner", fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  radar              Radar               @relation(fields: [radarId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  analysisSourceRefs AnalysisSourceRef[]
+
+  @@unique([radarId, sourceUrl])
+  @@index([ownerId])
+  @@index([radarId])
+  @@index([lifecycleStatus])
+  @@index([sourcePublishedAt])
+  @@index([technologyName])
+  @@index([vendor])
+}
+
+model TechnologyAnalysis {
+  id                        String         @id @default(cuid())
+  ownerId                   String
+  radarId                   String
+  organizationId            String?
+  visibility                Visibility     @default(PRIVATE)
+  title                     String
+  status                    AnalysisStatus @default(DRAFT)
+  analysisType              AnalysisType   @default(HYBRID)
+  analysisInputSummary      String?
+  analysisPromptVersion     String?
+  executiveSummary          String
+  opportunity               String?
+  risk                      String?
+  adoptionSignals           String?
+  uncertainties             String?
+  conclusion                String?
+  sourceTrustScore          Int
+  technicalValueScore       Int
+  engineeringReadinessScore Int
+  businessRelevanceScore    Int
+  adoptionRiskScore         Int
+  strategicValueScore       Int
+  communityHeatScore        Int
+  metadata                  Json?
+  createdAt                 DateTime       @default(now())
+  updatedAt                 DateTime       @updatedAt
+
+  owner           User                @relation("TechnologyAnalysisOwner", fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  radar           Radar               @relation(fields: [radarId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  sourceRefs      AnalysisSourceRef[]
+  recommendations Recommendation[]
+
+  @@index([ownerId])
+  @@index([radarId])
+  @@index([status])
+  @@index([analysisType])
+  @@index([radarId, updatedAt])
+}
+
+model AnalysisSourceRef {
+  id                 String                     @id @default(cuid())
+  analysisId         String
+  intelligenceItemId String
+  relationType       AnalysisSourceRelationType @default(SUPPORTING)
+  weight             Int?
+  note               String?
+  metadata           Json?
+  createdAt          DateTime                   @default(now())
+
+  analysis         TechnologyAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  intelligenceItem IntelligenceItem   @relation(fields: [intelligenceItemId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([analysisId, intelligenceItemId])
+  @@index([analysisId])
+  @@index([intelligenceItemId])
+}
+
+model Recommendation {
+  id              String                   @id @default(cuid())
+  ownerId         String
+  radarId         String
+  analysisId      String
+  organizationId  String?
+  visibility      Visibility               @default(PRIVATE)
+  title           String
+  actionType      RecommendationActionType
+  status          RecommendationStatus     @default(OPEN)
+  summary         String
+  rationale       String
+  expectedOutcome String?
+  riskNote        String?
+  priority        PriorityLevel?           @default(MEDIUM)
+  dueDate         DateTime?
+  decisionMemo    String?
+  metadata        Json?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  owner    User               @relation("RecommendationOwner", fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  radar    Radar              @relation(fields: [radarId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  analysis TechnologyAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  pocs     PoC[]
+
+  @@index([ownerId])
+  @@index([radarId])
+  @@index([analysisId])
+  @@index([actionType])
+  @@index([status])
+  @@index([radarId, status])
+}
+
+model PoC {
+  id                 String      @id @default(cuid())
+  ownerId            String
+  radarId            String
+  recommendationId   String
+  organizationId     String?
+  visibility         Visibility  @default(PRIVATE)
+  title              String
+  status             PocStatus   @default(PLANNED)
+  objective          String
+  hypothesis         String
+  successCriteria    String
+  outcome            PocOutcome?
+  plan               String?
+  findings           String?
+  risks              String?
+  recommendationBack String?
+  repoUrl            String?
+  demoUrl            String?
+  artifactUrl        String?
+  startDate          DateTime?
+  endDate            DateTime?
+  timeSpentHours     Decimal?    @db.Decimal(6, 2)
+  metadata           Json?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  owner          User           @relation("PoCOwner", fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  radar          Radar          @relation(fields: [radarId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  recommendation Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([ownerId])
+  @@index([radarId])
+  @@index([recommendationId])
+  @@index([status])
+  @@index([startDate])
+  @@index([radarId, status])
+}
+
+model DailyReport {
+  id                     String            @id @default(cuid())
+  ownerId                String
+  radarId                String
+  organizationId         String?
+  visibility             Visibility        @default(PRIVATE)
+  reportDate             DateTime
+  title                  String
+  status                 DailyReportStatus @default(DRAFT)
+  summary                String
+  highlights             String?
+  decisions              String?
+  risks                  String?
+  nextActions            String?
+  newIntelligenceCount   Int               @default(0)
+  newAnalysisCount       Int               @default(0)
+  newRecommendationCount Int               @default(0)
+  activePocCount         Int               @default(0)
+  publishedAt            DateTime?
+  metadata               Json?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+
+  owner User  @relation("DailyReportOwner", fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  radar Radar @relation(fields: [radarId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  // Future extension: add ReportIntelligenceRef / ReportAnalysisRef / ReportRecommendationRef / ReportPocRef
+
+  @@unique([radarId, reportDate])
+  @@index([ownerId])
+  @@index([radarId])
+  @@index([reportDate])
+  @@index([status])
+}
+
+model ActivityLog {
+  id             String             @id @default(cuid())
+  ownerId        String
+  actorId        String
+  radarId        String?
+  organizationId String?
+  visibility     Visibility         @default(PRIVATE)
+  entityType     ActivityEntityType
+  entityId       String
+  actionType     ActivityActionType
+  beforeSnapshot Json?
+  afterSnapshot  Json?
+  message        String?
+  metadata       Json?
+  createdAt      DateTime           @default(now())
+
+  owner User   @relation("ActivityLogOwner", fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  actor User   @relation("ActivityLogActor", fields: [actorId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  radar Radar? @relation(fields: [radarId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  // Future extension: Tag / Feedback / Organization related activity types can be added here.
+
+  @@index([ownerId])
+  @@index([actorId])
+  @@index([radarId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
