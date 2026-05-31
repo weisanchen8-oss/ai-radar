@@ -4,10 +4,11 @@
  * 当前页面定位为 AI 技术分析与验证平台的决策驾驶舱，
  * 展示 Radar、技术分析、推荐动作、PoC、风险提醒与日报入口。
  */
-
 import Link from "next/link";
 import { RadarAppShell } from "@/components/radar/radar-app-shell";
 import { getDashboardDecisionData } from "@/lib/data/dashboard";
+
+export const dynamic = "force-dynamic";
 
 type DashboardData = Awaited<ReturnType<typeof getDashboardDecisionData>>;
 type RadarCard = DashboardData["radars"][number];
