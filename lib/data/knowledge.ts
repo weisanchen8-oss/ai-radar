@@ -174,9 +174,10 @@ export async function getKnowledgeCenterData(
 }
 
 export async function getKnowledgeArticleBySlug(slug: string) {
+  const decodedSlug = decodeURIComponent(slug);
   const article = await prisma.knowledgeArticle.findFirst({
     where: {
-      slug,
+      slug: decodedSlug,
     },
     select: {
       id: true,
