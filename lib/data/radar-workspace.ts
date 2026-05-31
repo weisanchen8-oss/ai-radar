@@ -29,8 +29,12 @@ const intelligenceSelect = {
   sourceName: true,
   sourcePublishedAt: true,
   technologyName: true,
+  vendor: true,
+  topic: true,
   lifecycleStatus: true,
+  capturedAt: true,
   createdAt: true,
+  updatedAt: true,
 } as const;
 
 const analysisSelect = {
@@ -39,6 +43,10 @@ const analysisSelect = {
   status: true,
   analysisType: true,
   executiveSummary: true,
+  opportunity: true,
+  risk: true,
+  adoptionSignals: true,
+  uncertainties: true,
   conclusion: true,
   sourceTrustScore: true,
   technicalValueScore: true,
@@ -58,16 +66,24 @@ const recommendationSelect = {
   actionType: true,
   status: true,
   rationale: true,
+  expectedOutcome: true,
+  riskNote: true,
   priority: true,
+  dueDate: true,
   createdAt: true,
+  updatedAt: true,
 } as const;
 
 const pocSelect = {
   id: true,
   title: true,
   objective: true,
+  hypothesis: true,
+  successCriteria: true,
   status: true,
   outcome: true,
+  startDate: true,
+  endDate: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -76,16 +92,16 @@ const reportSelect = {
   id: true,
   title: true,
   summary: true,
+  highlights: true,
+  decisions: true,
+  risks: true,
+  nextActions: true,
   status: true,
   reportDate: true,
-  createdAt: true,
-} as const;
-
-const activitySelect = {
-  id: true,
-  entityType: true,
-  actionType: true,
-  message: true,
+  newIntelligenceCount: true,
+  newAnalysisCount: true,
+  newRecommendationCount: true,
+  activePocCount: true,
   createdAt: true,
 } as const;
 
@@ -105,7 +121,6 @@ export async function getRadarWorkspaceData(radarId: string) {
     recentRecommendations,
     recentPocs,
     recentDailyReports,
-    recentActivityLogs,
     intelligenceItemCount,
     analysisCount,
     recommendationCount,
@@ -116,19 +131,19 @@ export async function getRadarWorkspaceData(radarId: string) {
   ] = await Promise.all([
     prisma.intelligenceItem.findMany({
       where: { radarId },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ sourcePublishedAt: "desc" }, { createdAt: "desc" }],
       take: 8,
       select: intelligenceSelect,
     }),
     prisma.technologyAnalysis.findMany({
       where: { radarId },
       orderBy: { updatedAt: "desc" },
-      take: 3,
+      take: 4,
       select: analysisSelect,
     }),
     prisma.recommendation.findMany({
       where: { radarId },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
       take: 6,
       select: recommendationSelect,
     }),
@@ -144,12 +159,6 @@ export async function getRadarWorkspaceData(radarId: string) {
       take: 4,
       select: reportSelect,
     }),
-    prisma.activityLog.findMany({
-      where: { radarId },
-      orderBy: { createdAt: "desc" },
-      take: 8,
-      select: activitySelect,
-    }),
     prisma.intelligenceItem.count({ where: { radarId } }),
     prisma.technologyAnalysis.count({ where: { radarId } }),
     prisma.recommendation.count({ where: { radarId } }),
@@ -158,9 +167,7 @@ export async function getRadarWorkspaceData(radarId: string) {
     prisma.recommendation.count({
       where: {
         radarId,
-        priority: {
-          in: [PriorityLevel.HIGH, PriorityLevel.CRITICAL],
-        },
+        priority: { in: [PriorityLevel.HIGH, PriorityLevel.CRITICAL] },
       },
     }),
     prisma.poC.count({
@@ -178,7 +185,6 @@ export async function getRadarWorkspaceData(radarId: string) {
     recentRecommendations,
     recentPocs,
     recentDailyReports,
-    recentActivityLogs,
     stats: {
       intelligenceItemCount,
       analysisCount,
