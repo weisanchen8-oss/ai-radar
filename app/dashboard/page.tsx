@@ -14,6 +14,7 @@ type RadarCard = DashboardData["radars"][number];
 type HighValueAnalysis = DashboardData["recentHighValueAnalyses"][number];
 type RiskAnalysis = DashboardData["recentRiskAnalyses"][number];
 type DailyReport = DashboardData["recentDailyReports"][number];
+type TopConnectedTechnology = DashboardData["topConnectedTechnologies"][number];
 
 function formatDate(value: Date | string | null | undefined) {
   if (!value) {
@@ -316,6 +317,58 @@ function RadarWorkspaceCard({ radar }: { radar: RadarCard }) {
   );
 }
 
+function TopConnectedTechnologyCard({
+  technology,
+}: {
+  technology: TopConnectedTechnology;
+}) {
+  return (
+    <Link
+      href={`/radars/${technology.radar.id}/workspace`}
+      className="group rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-xl shadow-black/20 transition hover:border-cyan-300/40 hover:bg-cyan-300/[0.06]"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold text-white group-hover:text-cyan-100">
+            {technology.name}
+          </h3>
+          <p className="mt-1 text-xs text-cyan-200/80">
+            {technology.category ?? "未分类"}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-3 py-2 text-right">
+          <p className="text-xs text-cyan-100/80">连接度</p>
+          <p className="text-xl font-semibold text-cyan-100">
+            {technology.connectedCount}
+          </p>
+        </div>
+      </div>
+
+      <p className="mt-3 text-sm text-slate-300">
+        所属 Radar：{technology.radar.name}
+      </p>
+
+      {technology.description ? (
+        <p className="mt-3 text-sm leading-6 text-slate-400">
+          {technology.description}
+        </p>
+      ) : (
+        <p className="mt-3 text-sm text-slate-500">暂无技术说明。</p>
+      )}
+
+      <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-300">
+        <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1">
+          入向 {technology.incomingCount}
+        </span>
+        <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1">
+          出向 {technology.outgoingCount}
+        </span>
+      </div>
+    </Link>
+  );
+}
+
 function CountBox({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-2 py-3">
@@ -528,6 +581,27 @@ export default async function DashboardPage() {
               </div>
             )}
           </div>
+        </section>
+
+        <section className="space-y-5">
+          <SectionHeader
+            eyebrow="Technology Graph"
+            title="Top Connected Technologies"
+            description="按技术节点的入向关系与出向关系数量计算连接度，展示当前数据库中关系最密集的技术。"
+          />
+
+          {data.topConnectedTechnologies.length === 0 ? (
+            <EmptyState text="暂无技术图谱数据。完成 Technology Graph seed 后会在这里显示连接度最高的技术。" />
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {data.topConnectedTechnologies.map((technology) => (
+                <TopConnectedTechnologyCard
+                  key={technology.id}
+                  technology={technology}
+                />
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="space-y-5">

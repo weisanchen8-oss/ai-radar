@@ -123,6 +123,16 @@ enum ActivityEntityType {
   RECOMMENDATION
   POC
   DAILY_REPORT
+  TECHNOLOGY_NODE
+  TECHNOLOGY_RELATION
+}
+
+enum TechnologyRelationType {
+  RELATED
+  ALTERNATIVE
+  DEPENDENCY
+  PART_OF
+  ENABLES
 }
 
 enum ActivityActionType {
@@ -149,14 +159,16 @@ model User {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
-  ownedRadars             Radar[]              @relation("RadarOwner")
-  ownedIntelligenceItems  IntelligenceItem[]   @relation("IntelligenceItemOwner")
-  ownedTechnologyAnalyses TechnologyAnalysis[] @relation("TechnologyAnalysisOwner")
-  ownedRecommendations    Recommendation[]     @relation("RecommendationOwner")
-  ownedPocs               PoC[]                @relation("PoCOwner")
-  ownedDailyReports       DailyReport[]        @relation("DailyReportOwner")
-  ownedActivityLogs       ActivityLog[]        @relation("ActivityLogOwner")
-  actedActivityLogs       ActivityLog[]        @relation("ActivityLogActor")
+  ownedRadars              Radar[]              @relation("RadarOwner")
+  ownedIntelligenceItems   IntelligenceItem[]   @relation("IntelligenceItemOwner")
+  ownedTechnologyAnalyses  TechnologyAnalysis[] @relation("TechnologyAnalysisOwner")
+  ownedRecommendations     Recommendation[]     @relation("RecommendationOwner")
+  ownedPocs                PoC[]                @relation("PoCOwner")
+  ownedDailyReports        DailyReport[]        @relation("DailyReportOwner")
+  ownedTechnologyNodes     TechnologyNode[]     @relation("TechnologyNodeOwner")
+  ownedTechnologyRelations TechnologyRelation[] @relation("TechnologyRelationOwner")
+  ownedActivityLogs        ActivityLog[]        @relation("ActivityLogOwner")
+  actedActivityLogs        ActivityLog[]        @relation("ActivityLogActor")
 
   @@index([organizationId])
 }
@@ -184,13 +196,15 @@ model Radar {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  owner              User                 @relation("RadarOwner", fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  intelligenceItems  IntelligenceItem[]
-  technologyAnalyses TechnologyAnalysis[]
-  recommendations    Recommendation[]
-  pocs               PoC[]
-  dailyReports       DailyReport[]
-  activityLogs       ActivityLog[]
+  owner               User                 @relation("RadarOwner", fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  intelligenceItems   IntelligenceItem[]
+  technologyAnalyses  TechnologyAnalysis[]
+  recommendations     Recommendation[]
+  pocs                PoC[]
+  dailyReports        DailyReport[]
+  technologyNodes     TechnologyNode[]
+  technologyRelations TechnologyRelation[]
+  activityLogs        ActivityLog[]
 
   @@unique([ownerId, slug])
   @@index([ownerId])
@@ -399,6 +413,65 @@ model DailyReport {
   @@index([radarId])
   @@index([reportDate])
   @@index([status])
+}
+
+model TechnologyNode {
+  id             String     @id @default(cuid())
+  ownerId        String
+  radarId        String
+  organizationId String?
+  visibility     Visibility @default(PRIVATE)
+
+  name        String
+  description String?
+  category    String?
+  metadata    Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner User  @relation("TechnologyNodeOwner", fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  radar Radar @relation(fields: [radarId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  outgoingRelations TechnologyRelation[] @relation("TechnologyRelationSource")
+  incomingRelations TechnologyRelation[] @relation("TechnologyRelationTarget")
+
+  @@unique([radarId, name])
+  @@index([ownerId])
+  @@index([radarId])
+  @@index([category])
+  @@index([organizationId])
+}
+
+model TechnologyRelation {
+  id             String     @id @default(cuid())
+  ownerId        String
+  radarId        String
+  organizationId String?
+  visibility     Visibility @default(PRIVATE)
+
+  sourceNodeId String
+  targetNodeId String
+  relationType TechnologyRelationType
+  strength     Int                    @default(1)
+  note         String?
+  metadata     Json?
+
+  createdAt DateTime @default(now())
+
+  owner User  @relation("TechnologyRelationOwner", fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  radar Radar @relation(fields: [radarId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  sourceNode TechnologyNode @relation("TechnologyRelationSource", fields: [sourceNodeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  targetNode TechnologyNode @relation("TechnologyRelationTarget", fields: [targetNodeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([sourceNodeId, targetNodeId, relationType])
+  @@index([ownerId])
+  @@index([radarId])
+  @@index([sourceNodeId])
+  @@index([targetNodeId])
+  @@index([relationType])
+  @@index([radarId, relationType])
 }
 
 model ActivityLog {

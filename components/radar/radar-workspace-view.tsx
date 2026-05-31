@@ -152,6 +152,23 @@ function getActionMessage(action?: string) {
   return action ? map[action] : undefined;
 }
 
+function formatTechnologyRelationType(value: string) {
+  switch (value) {
+    case "RELATED":
+      return "相关技术";
+    case "ALTERNATIVE":
+      return "替代方案";
+    case "DEPENDENCY":
+      return "依赖关系";
+    case "PART_OF":
+      return "组成部分";
+    case "ENABLES":
+      return "能力支持";
+    default:
+      return value;
+  }
+}
+
 export function RadarWorkspaceView({ data, actionMessage }: RadarWorkspaceViewProps) {
   const {
     radar,
@@ -160,6 +177,7 @@ export function RadarWorkspaceView({ data, actionMessage }: RadarWorkspaceViewPr
     recentRecommendations,
     recentPocs,
     recentDailyReports,
+    technologyNetwork,
     stats,
   } = data;
 
@@ -613,6 +631,161 @@ export function RadarWorkspaceView({ data, actionMessage }: RadarWorkspaceViewPr
             </div>
           )}
         </Section>
+
+        <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/20">
+          <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-200/80">
+                Technology Network
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold text-white">
+                技术关系网络
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+                展示当前 Radar 下已沉淀的技术关系，包括相关技术、替代方案和依赖关系。当前版本先展示结构化关联，不做图谱可视化。
+              </p>
+            </div>
+          </div>
+        
+          <div className="grid gap-3 md:grid-cols-5">
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <p className="text-xs text-slate-400">技术节点</p>
+              <p className="mt-2 text-2xl font-semibold text-white">
+                {stats.technologyNodeCount}
+              </p>
+            </div>
+        
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <p className="text-xs text-slate-400">技术关系</p>
+              <p className="mt-2 text-2xl font-semibold text-white">
+                {stats.technologyRelationCount}
+              </p>
+            </div>
+        
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <p className="text-xs text-slate-400">相关关系</p>
+              <p className="mt-2 text-2xl font-semibold text-white">
+                {technologyNetwork?.stats.relatedCount ?? 0}
+              </p>
+            </div>
+        
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <p className="text-xs text-slate-400">替代关系</p>
+              <p className="mt-2 text-2xl font-semibold text-white">
+                {technologyNetwork?.stats.alternativeCount ?? 0}
+              </p>
+            </div>
+        
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <p className="text-xs text-slate-400">依赖关系</p>
+              <p className="mt-2 text-2xl font-semibold text-white">
+                {technologyNetwork?.stats.dependencyCount ?? 0}
+              </p>
+            </div>
+          </div>
+        
+          {!technologyNetwork || technologyNetwork.stats.relationCount === 0 ? (
+            <div className="mt-5 rounded-2xl border border-dashed border-white/10 bg-black/20 p-5 text-sm text-slate-300">
+              当前 Radar 暂无技术关系数据。后续可从情报分析、推荐动作和 PoC 结论中沉淀技术节点与关系。
+            </div>
+          ) : (
+            <div className="mt-6 grid gap-4 lg:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <h3 className="text-base font-semibold text-white">
+                  Related Technologies
+                </h3>
+        
+                <div className="mt-4 space-y-3">
+                  {technologyNetwork.relatedRelations.length === 0 ? (
+                    <p className="text-sm text-slate-400">暂无相关技术关系。</p>
+                  ) : (
+                    technologyNetwork.relatedRelations.map((relation) => (
+                      <div
+                        key={relation.id}
+                        className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+                      >
+                        <p className="text-sm font-medium text-white">
+                          {relation.sourceNode.name} → {relation.targetNode.name}
+                        </p>
+                        <p className="mt-2 text-xs text-cyan-200">
+                          {formatTechnologyRelationType(relation.relationType)} · 强度{" "}
+                          {relation.strength}
+                        </p>
+                        {relation.note ? (
+                          <p className="mt-2 text-sm leading-6 text-slate-300">
+                            {relation.note}
+                          </p>
+                        ) : null}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+        
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <h3 className="text-base font-semibold text-white">
+                  Alternative Technologies
+                </h3>
+        
+                <div className="mt-4 space-y-3">
+                  {technologyNetwork.alternativeRelations.length === 0 ? (
+                    <p className="text-sm text-slate-400">暂无替代方案关系。</p>
+                  ) : (
+                    technologyNetwork.alternativeRelations.map((relation) => (
+                      <div
+                        key={relation.id}
+                        className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+                      >
+                        <p className="text-sm font-medium text-white">
+                          {relation.sourceNode.name} ↔ {relation.targetNode.name}
+                        </p>
+                        <p className="mt-2 text-xs text-amber-200">
+                          {formatTechnologyRelationType(relation.relationType)} · 强度{" "}
+                          {relation.strength}
+                        </p>
+                        {relation.note ? (
+                          <p className="mt-2 text-sm leading-6 text-slate-300">
+                            {relation.note}
+                          </p>
+                        ) : null}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+        
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <h3 className="text-base font-semibold text-white">Dependencies</h3>
+        
+                <div className="mt-4 space-y-3">
+                  {technologyNetwork.dependencyRelations.length === 0 ? (
+                    <p className="text-sm text-slate-400">暂无依赖关系。</p>
+                  ) : (
+                    technologyNetwork.dependencyRelations.map((relation) => (
+                      <div
+                        key={relation.id}
+                        className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+                      >
+                        <p className="text-sm font-medium text-white">
+                          {relation.sourceNode.name} → {relation.targetNode.name}
+                        </p>
+                        <p className="mt-2 text-xs text-violet-200">
+                          {formatTechnologyRelationType(relation.relationType)} · 强度{" "}
+                          {relation.strength}
+                        </p>
+                        {relation.note ? (
+                          <p className="mt-2 text-sm leading-6 text-slate-300">
+                            {relation.note}
+                          </p>
+                        ) : null}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );

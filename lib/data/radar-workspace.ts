@@ -1,5 +1,6 @@
 import { PocStatus, PriorityLevel } from "@prisma/client";
 import { prisma } from "../prisma";
+import { getRadarTechnologyNetworkData } from './technology-graph'
 
 const radarSelect = {
   id: true,
@@ -129,6 +130,7 @@ export async function getRadarWorkspaceData(radarId: string) {
     dailyReportCount,
     highPriorityRecommendationCount,
     runningPocCount,
+    technologyNetwork,
   ] = await Promise.all([
     prisma.intelligenceItem.findMany({
       where: { radarId },
@@ -177,6 +179,7 @@ export async function getRadarWorkspaceData(radarId: string) {
         status: PocStatus.IN_PROGRESS,
       },
     }),
+    getRadarTechnologyNetworkData(radarId),
   ]);
 
   return {
@@ -186,6 +189,7 @@ export async function getRadarWorkspaceData(radarId: string) {
     recentRecommendations,
     recentPocs,
     recentDailyReports,
+    technologyNetwork,
     stats: {
       intelligenceItemCount,
       analysisCount,
@@ -194,6 +198,8 @@ export async function getRadarWorkspaceData(radarId: string) {
       dailyReportCount,
       highPriorityRecommendationCount,
       runningPocCount,
+      technologyNodeCount: technologyNetwork?.stats.nodeCount ?? 0,
+      technologyRelationCount: technologyNetwork?.stats.relationCount ?? 0,
     },
   };
 }

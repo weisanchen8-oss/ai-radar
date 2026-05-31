@@ -15,11 +15,129 @@ import {
   RecommendationActionType,
   RecommendationStatus,
   ScanIntensity,
+  TechnologyRelationType,
   UserStatus,
   Visibility,
 } from '@prisma/client'
 
 const prisma = new PrismaClient()
+
+type SeedRadar = {
+  id: string
+  ownerId: string
+  organizationId: string | null
+  visibility: Visibility
+  name: string
+}
+
+type SeedTechnologyNodeInput = {
+  name: string
+  description: string
+  category: string
+}
+
+type SeedTechnologyRelationInput = {
+  source: string
+  target: string
+  relationType: TechnologyRelationType
+  strength: number
+  note: string
+}
+
+async function seedTechnologyGraphForRadar(
+  radar: SeedRadar,
+  nodes: SeedTechnologyNodeInput[],
+  relations: SeedTechnologyRelationInput[],
+) {
+  const nodeMap = new Map<string, { id: string; name: string }>()
+
+  for (const node of nodes) {
+    const savedNode = await prisma.technologyNode.upsert({
+      where: {
+        radarId_name: {
+          radarId: radar.id,
+          name: node.name,
+        },
+      },
+      update: {
+        description: node.description,
+        category: node.category,
+        metadata: {
+          source: 'seed',
+          version: 'technology-graph-1.0',
+          radarName: radar.name,
+        },
+      },
+      create: {
+        ownerId: radar.ownerId,
+        radarId: radar.id,
+        organizationId: radar.organizationId,
+        visibility: radar.visibility,
+        name: node.name,
+        description: node.description,
+        category: node.category,
+        metadata: {
+          source: 'seed',
+          version: 'technology-graph-1.0',
+          radarName: radar.name,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+    })
+
+    nodeMap.set(savedNode.name, savedNode)
+  }
+
+  for (const relation of relations) {
+    const sourceNode = nodeMap.get(relation.source)
+    const targetNode = nodeMap.get(relation.target)
+
+    if (!sourceNode || !targetNode) {
+      console.warn(
+        `跳过技术关系：${relation.source} -> ${relation.target}，因为节点不存在。`,
+      )
+      continue
+    }
+
+    await prisma.technologyRelation.upsert({
+      where: {
+        sourceNodeId_targetNodeId_relationType: {
+          sourceNodeId: sourceNode.id,
+          targetNodeId: targetNode.id,
+          relationType: relation.relationType,
+        },
+      },
+      update: {
+        strength: relation.strength,
+        note: relation.note,
+        metadata: {
+          source: 'seed',
+          version: 'technology-graph-1.0',
+          radarName: radar.name,
+        },
+      },
+      create: {
+        ownerId: radar.ownerId,
+        radarId: radar.id,
+        organizationId: radar.organizationId,
+        visibility: radar.visibility,
+        sourceNodeId: sourceNode.id,
+        targetNodeId: targetNode.id,
+        relationType: relation.relationType,
+        strength: relation.strength,
+        note: relation.note,
+        metadata: {
+          source: 'seed',
+          version: 'technology-graph-1.0',
+          radarName: radar.name,
+        },
+      },
+    })
+  }
+}
 
 type SeedIntelligenceItem = {
   title: string
@@ -655,6 +773,266 @@ async function main() {
         timeSpentHours: radarInput.poc.timeSpentHours,
       },
     })
+
+    const seedRadars = await prisma.radar.findMany({
+      orderBy: {
+        createdAt: 'asc',
+      },
+      select: {
+        id: true,
+        ownerId: true,
+        organizationId: true,
+        visibility: true,
+        name: true,
+        businessDomain: true,
+      },
+    })
+  
+    for (const radar of seedRadars) {
+      const radarName = radar.name.toLowerCase()
+      const businessDomain = (radar.businessDomain ?? '').toLowerCase()
+  
+      if (
+        radarName.includes('sales') ||
+        businessDomain.includes('sales') ||
+        businessDomain.includes('b2b')
+      ) {
+        await seedTechnologyGraphForRadar(
+          radar,
+          [
+            {
+              name: 'LangGraph',
+              description: '用于构建多步骤 Agent 工作流和状态机的工程框架。',
+              category: 'Agent Framework',
+            },
+            {
+              name: 'LangChain',
+              description: '用于构建 LLM 应用和 Agent 编排的通用开发框架。',
+              category: 'Agent Framework',
+            },
+            {
+              name: 'RAG',
+              description:
+                '结合检索与生成的知识增强方案，用于提升 Agent 对业务知识的回答能力。',
+              category: 'Knowledge Architecture',
+            },
+            {
+              name: 'Tool Calling',
+              description:
+                '让模型调用外部工具、数据库或业务系统的能力，是 Agent 落地的关键机制。',
+              category: 'Agent Capability',
+            },
+            {
+              name: 'Function Calling',
+              description:
+                '通过结构化函数接口约束模型输出，使业务系统可以稳定调用模型能力。',
+              category: 'Model Interface',
+            },
+            {
+              name: 'Vector Database',
+              description: '用于存储和检索向量化知识，是 RAG 系统常见基础设施。',
+              category: 'Infrastructure',
+            },
+          ],
+          [
+            {
+              source: 'LangGraph',
+              target: 'Tool Calling',
+              relationType: TechnologyRelationType.ENABLES,
+              strength: 5,
+              note: 'LangGraph 可以组织多步骤工具调用流程，适合销售 Agent 的工作流编排。',
+            },
+            {
+              source: 'RAG',
+              target: 'Vector Database',
+              relationType: TechnologyRelationType.DEPENDENCY,
+              strength: 4,
+              note: '多数 RAG 方案依赖向量数据库完成知识检索。',
+            },
+            {
+              source: 'Tool Calling',
+              target: 'Function Calling',
+              relationType: TechnologyRelationType.RELATED,
+              strength: 4,
+              note: '两者都属于模型连接业务系统的结构化调用机制。',
+            },
+            {
+              source: 'Tool Calling',
+              target: 'LangGraph',
+              relationType: TechnologyRelationType.PART_OF,
+              strength: 3,
+              note: '工具调用通常作为 Agent Workflow 的步骤之一被编排。',
+            },
+            {
+              source: 'LangGraph',
+              target: 'LangChain',
+              relationType: TechnologyRelationType.ALTERNATIVE,
+              strength: 4,
+              note: '两者都可用于 Agent 工作流开发，LangGraph 更偏状态机和流程编排，LangChain 更偏通用 LLM 应用开发。',
+            },
+          ],
+        )
+  
+        continue
+      }
+
+      if (
+        radarName.includes('衣橱') ||
+        radarName.includes('wardrobe') ||
+        businessDomain.includes('wardrobe') ||
+        businessDomain.includes('穿搭')
+      ) {
+        await seedTechnologyGraphForRadar(
+          radar,
+          [
+            {
+              name: 'VLM',
+              description:
+                '视觉语言模型，可同时理解图片和文本，是智能衣物识别的核心能力。',
+              category: 'Multimodal Model',
+            },
+            {
+              name: 'Qwen-VL',
+              description: '可用于图像理解、物体识别和多模态问答的视觉语言模型。',
+              category: 'VLM Provider',
+            },
+            {
+              name: 'GPT-4o Vision',
+              description: '可用于图像理解、视觉问答和多模态任务的视觉模型能力。',
+              category: 'VLM Provider',
+            },
+            {
+              name: 'Image Recognition',
+              description: '用于识别衣物类别、颜色、风格和材质等视觉特征。',
+              category: 'Computer Vision',
+            },
+            {
+              name: 'Weather API',
+              description: '提供温度、天气、风力等外部上下文，用于驱动穿搭推荐。',
+              category: 'External API',
+            },
+            {
+              name: 'Recommendation Engine',
+              description: '根据衣物、天气、场景和用户偏好生成穿搭建议。',
+              category: 'Recommendation',
+            },
+          ],
+          [
+            {
+              source: 'Qwen-VL',
+              target: 'VLM',
+              relationType: TechnologyRelationType.PART_OF,
+              strength: 4,
+              note: 'Qwen-VL 是可选的 VLM 技术实现之一。',
+            },
+            {
+              source: 'VLM',
+              target: 'Image Recognition',
+              relationType: TechnologyRelationType.ENABLES,
+              strength: 5,
+              note: 'VLM 可以增强衣物图片理解和属性识别能力。',
+            },
+            {
+              source: 'Weather API',
+              target: 'Recommendation Engine',
+              relationType: TechnologyRelationType.ENABLES,
+              strength: 4,
+              note: '天气数据是穿搭推荐的重要上下文信号。',
+            },
+            {
+              source: 'Image Recognition',
+              target: 'Recommendation Engine',
+              relationType: TechnologyRelationType.DEPENDENCY,
+              strength: 3,
+              note: '推荐引擎需要依赖衣物识别结果理解用户衣橱内容。',
+            },
+            {
+              source: 'Qwen-VL',
+              target: 'GPT-4o Vision',
+              relationType: TechnologyRelationType.ALTERNATIVE,
+              strength: 4,
+              note: '两者都可作为智能衣橱图像理解能力的候选 VLM 方案。',
+            },
+          ],
+        )
+  
+        continue
+      }
+
+      await seedTechnologyGraphForRadar(
+        radar,
+        [
+          {
+            name: 'TERA Evaluation',
+            description:
+              '从技术价值、工程可行性、风险和行动建议等维度评估技术情报。',
+            category: 'Evaluation Method',
+          },
+          {
+            name: 'Technology Graph',
+            description: '沉淀技术、能力、工具、框架和验证记录之间的关系。',
+            category: 'Knowledge Network',
+          },
+          {
+            name: 'Source Trust',
+            description: '用于判断情报来源可信度，减少低质量技术噪声。',
+            category: 'Information Quality',
+          },
+          {
+            name: 'Daily Report',
+            description: '将高价值技术变化整理为每日决策摘要。',
+            category: 'Reporting',
+          },
+          {
+            name: 'PoC Validation',
+            description: '把推荐动作转化为可验证实验，形成技术决策闭环。',
+            category: 'Validation',
+          },
+          {
+            name: 'Knowledge Graph',
+            description: '用于表达实体、概念和关系的结构化知识网络。',
+            category: 'Knowledge Network',
+          },
+        ],
+        [
+          {
+            source: 'Source Trust',
+            target: 'TERA Evaluation',
+            relationType: TechnologyRelationType.ENABLES,
+            strength: 5,
+            note: '来源可信度会直接影响技术分析和评分质量。',
+          },
+          {
+            source: 'TERA Evaluation',
+            target: 'Daily Report',
+            relationType: TechnologyRelationType.ENABLES,
+            strength: 4,
+            note: '日报应优先呈现通过评估筛选出的高价值技术变化。',
+          },
+          {
+            source: 'PoC Validation',
+            target: 'Technology Graph',
+            relationType: TechnologyRelationType.PART_OF,
+            strength: 4,
+            note: 'PoC 结论会沉淀为技术图谱中的验证关系。',
+          },
+          {
+            source: 'Technology Graph',
+            target: 'TERA Evaluation',
+            relationType: TechnologyRelationType.RELATED,
+            strength: 4,
+            note: '技术图谱可以为后续技术评估提供上下文关系。',
+          },
+          {
+            source: 'Technology Graph',
+            target: 'Knowledge Graph',
+            relationType: TechnologyRelationType.ALTERNATIVE,
+            strength: 3,
+            note: 'Technology Graph 是面向技术决策场景的轻量图谱，Knowledge Graph 是更通用的知识组织方式。',
+          },
+        ],
+      )
+    }
 
     await prisma.dailyReport.create({
       data: {
