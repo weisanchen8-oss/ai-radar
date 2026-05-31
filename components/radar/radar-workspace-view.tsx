@@ -11,10 +11,19 @@ import {
   hasTechnologyGraphLite,
   parseTechnologyGraphLite,
 } from "@/lib/technology-graph";
+import { DecisionHistory } from "@/components/radar/decision-history";
 
 type WorkspaceData = NonNullable<
   Awaited<ReturnType<typeof getRadarWorkspaceData>>
 >;
+
+type RecentIntelligence = WorkspaceData["recentIntelligence"][number];
+type RecentAnalysis = WorkspaceData["recentAnalyses"][number];
+type RecentRecommendation = WorkspaceData["recentRecommendations"][number];
+type RecentPoc = WorkspaceData["recentPocs"][number];
+type RecentDailyReport = WorkspaceData["recentDailyReports"][number];
+type TechnologyNetwork = NonNullable<WorkspaceData["technologyNetwork"]>;
+type RelatedRelation = TechnologyNetwork["relatedRelations"][number];
 
 type RadarWorkspaceViewProps = {
   data: WorkspaceData;
@@ -177,6 +186,7 @@ export function RadarWorkspaceView({ data, actionMessage }: RadarWorkspaceViewPr
     recentRecommendations,
     recentPocs,
     recentDailyReports,
+    recentDecisions,
     technologyNetwork,
     stats,
   } = data;
@@ -203,7 +213,7 @@ export function RadarWorkspaceView({ data, actionMessage }: RadarWorkspaceViewPr
 
   const focusTechnologies =
     recentIntelligence
-      .map((item) => item.technologyName)
+      .map((item: RecentIntelligence) => item.technologyName)
       .filter(Boolean)
       .slice(0, 4)
       .join("、") || "暂未形成明确技术方向";
@@ -294,12 +304,18 @@ export function RadarWorkspaceView({ data, actionMessage }: RadarWorkspaceViewPr
         </div>
       </Section>
 
+      <DecisionHistory
+        decisions={recentDecisions}
+        title="Decision History"
+        emptyText="当前 Radar 暂无历史技术决策。"
+      />
+
       <Section title="Intelligence Feed" desc="展示当前 Radar 下最近捕获的技术情报，并提供观察、PoC、收藏和不相关标记。">
         {recentIntelligence.length === 0 ? (
           <EmptyState text="当前暂无技术情报。" />
         ) : (
           <div className="grid gap-4">
-            {recentIntelligence.map((item) => (
+            {recentIntelligence.map((item: RecentIntelligence) => (
               <article
                 key={item.id}
                 className="rounded-3xl border border-white/10 bg-black/15 p-5"
@@ -394,7 +410,7 @@ export function RadarWorkspaceView({ data, actionMessage }: RadarWorkspaceViewPr
           <EmptyState text="当前暂无技术分析。" />
         ) : (
           <div className="grid gap-4">
-            {recentAnalyses.map((analysis) => {
+            {recentAnalyses.map((analysis: RecentAnalysis) => {
               const graphLite = parseTechnologyGraphLite(analysis.metadata);
               const hasGraphLite = hasTechnologyGraphLite(graphLite);
 
@@ -479,7 +495,8 @@ export function RadarWorkspaceView({ data, actionMessage }: RadarWorkspaceViewPr
           <EmptyState text="当前暂无推荐动作。" />
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            {recentRecommendations.map((recommendation) => (
+            {recentRecommendations.map(
+              (recommendation: RecentRecommendation) => (
               <article
                 key={recommendation.id}
                 className="rounded-3xl border border-white/10 bg-black/15 p-5"
@@ -565,7 +582,7 @@ export function RadarWorkspaceView({ data, actionMessage }: RadarWorkspaceViewPr
             <EmptyState text="当前暂无 PoC。" />
           ) : (
             <div className="space-y-3">
-              {recentPocs.map((poc) => (
+              {recentPocs.map((poc: RecentPoc) => (
                 <Link
                   className="block rounded-2xl border border-white/10 bg-black/15 p-4 hover:bg-white/[0.08]"
                   href={`/radars/${radar.id}/pocs/${poc.id}`}
@@ -605,7 +622,7 @@ export function RadarWorkspaceView({ data, actionMessage }: RadarWorkspaceViewPr
             <EmptyState text="当前暂无日报。" />
           ) : (
             <div className="space-y-3">
-              {recentDailyReports.map((report) => (
+              {recentDailyReports.map((report: RecentDailyReport) => (
                 <Link
                   className="block rounded-2xl border border-white/10 bg-black/15 p-4 hover:bg-white/[0.08]"
                   href={`/radars/${radar.id}/daily-reports/${report.id}`}
@@ -699,7 +716,7 @@ export function RadarWorkspaceView({ data, actionMessage }: RadarWorkspaceViewPr
                   {technologyNetwork.relatedRelations.length === 0 ? (
                     <p className="text-sm text-slate-400">暂无相关技术关系。</p>
                   ) : (
-                    technologyNetwork.relatedRelations.map((relation) => (
+                    technologyNetwork.relatedRelations.map((relation: RelatedRelation) => (
                       <div
                         key={relation.id}
                         className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
@@ -731,7 +748,7 @@ export function RadarWorkspaceView({ data, actionMessage }: RadarWorkspaceViewPr
                   {technologyNetwork.alternativeRelations.length === 0 ? (
                     <p className="text-sm text-slate-400">暂无替代方案关系。</p>
                   ) : (
-                    technologyNetwork.alternativeRelations.map((relation) => (
+                    technologyNetwork.alternativeRelations.map((relation: RelatedRelation) => (
                       <div
                         key={relation.id}
                         className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
@@ -761,7 +778,7 @@ export function RadarWorkspaceView({ data, actionMessage }: RadarWorkspaceViewPr
                   {technologyNetwork.dependencyRelations.length === 0 ? (
                     <p className="text-sm text-slate-400">暂无依赖关系。</p>
                   ) : (
-                    technologyNetwork.dependencyRelations.map((relation) => (
+                    technologyNetwork.dependencyRelations.map((relation: RelatedRelation) => (
                       <div
                         key={relation.id}
                         className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"

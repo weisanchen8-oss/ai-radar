@@ -1,6 +1,10 @@
 import { PocStatus, PriorityLevel } from "@prisma/client";
 import { prisma } from "../prisma";
-import { getRadarTechnologyNetworkData } from './technology-graph'
+import { getRadarTechnologyNetworkData } from "./technology-graph";
+import {
+  getDecisionHistoryForRadar,
+  syncRadarDecisionTimeline,
+} from "@/lib/data/radar-memory";
 
 const radarSelect = {
   id: true,
@@ -117,12 +121,15 @@ export async function getRadarWorkspaceData(radarId: string) {
     return null;
   }
 
+  await syncRadarDecisionTimeline(radarId);
+
   const [
     recentIntelligence,
     recentAnalyses,
     recentRecommendations,
     recentPocs,
     recentDailyReports,
+    recentDecisions,
     intelligenceItemCount,
     analysisCount,
     recommendationCount,
@@ -162,6 +169,7 @@ export async function getRadarWorkspaceData(radarId: string) {
       take: 4,
       select: reportSelect,
     }),
+    getDecisionHistoryForRadar(radarId, 8),
     prisma.intelligenceItem.count({ where: { radarId } }),
     prisma.technologyAnalysis.count({ where: { radarId } }),
     prisma.recommendation.count({ where: { radarId } }),
@@ -189,6 +197,7 @@ export async function getRadarWorkspaceData(radarId: string) {
     recentRecommendations,
     recentPocs,
     recentDailyReports,
+    recentDecisions,
     technologyNetwork,
     stats: {
       intelligenceItemCount,

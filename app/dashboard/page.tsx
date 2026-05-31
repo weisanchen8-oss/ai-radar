@@ -2,20 +2,26 @@
  * 文件作用：
  * 定义 AI Radar Dashboard 首页。
  * 当前页面定位为 AI 技术分析与验证平台的决策驾驶舱，
- * 展示 Radar、技术分析、推荐动作、PoC、风险提醒与日报入口。
+ * 展示 Radar、技术分析、推荐动作、PoC、技术图谱、风险提醒、日报入口和近期决策记忆。
  */
+
 import Link from "next/link";
+import { DecisionHistory } from "@/components/radar/decision-history";
 import { RadarAppShell } from "@/components/radar/radar-app-shell";
-import { getDashboardDecisionData } from "@/lib/data/dashboard";
+import {
+  getDashboardDecisionData,
+  type DashboardDecisionData,
+} from "@/lib/data/dashboard";
+import { getRecentDecisionsForDashboard } from "@/lib/data/radar-memory";
 
 export const dynamic = "force-dynamic";
 
-type DashboardData = Awaited<ReturnType<typeof getDashboardDecisionData>>;
-type RadarCard = DashboardData["radars"][number];
-type HighValueAnalysis = DashboardData["recentHighValueAnalyses"][number];
-type RiskAnalysis = DashboardData["recentRiskAnalyses"][number];
-type DailyReport = DashboardData["recentDailyReports"][number];
-type TopConnectedTechnology = DashboardData["topConnectedTechnologies"][number];
+type RadarCard = DashboardDecisionData["radars"][number];
+type HighValueAnalysis = DashboardDecisionData["recentHighValueAnalyses"][number];
+type RiskAnalysis = DashboardDecisionData["recentRiskAnalyses"][number];
+type DailyReport = DashboardDecisionData["recentDailyReports"][number];
+type TopConnectedTechnology =
+  DashboardDecisionData["topConnectedTechnologies"][number];
 
 function formatDate(value: Date | string | null | undefined) {
   if (!value) {
@@ -87,12 +93,10 @@ function MetricCard({
   description: string;
 }) {
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-2xl shadow-black/20 backdrop-blur">
+    <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-xl shadow-black/10">
       <p className="text-sm text-slate-400">{label}</p>
-      <p className="mt-3 text-3xl font-semibold tracking-tight text-white">
-        {value}
-      </p>
-      <p className="mt-2 text-xs leading-5 text-slate-500">{description}</p>
+      <p className="mt-3 text-3xl font-semibold text-white">{value}</p>
+      <p className="mt-3 text-sm leading-6 text-slate-400">{description}</p>
     </div>
   );
 }
@@ -108,18 +112,20 @@ function SectionHeader({
 }) {
   return (
     <div>
-      <p className="text-xs font-medium uppercase tracking-[0.28em] text-cyan-300/80">
+      <p className="text-xs font-medium uppercase tracking-[0.24em] text-cyan-300/80">
         {eyebrow}
       </p>
-      <h2 className="mt-2 text-xl font-semibold text-white">{title}</h2>
-      <p className="mt-2 text-sm leading-6 text-slate-400">{description}</p>
+      <h2 className="mt-2 text-2xl font-semibold text-white">{title}</h2>
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+        {description}
+      </p>
     </div>
   );
 }
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.03] p-6 text-sm text-slate-400">
+    <div className="rounded-3xl border border-dashed border-white/15 bg-white/[0.03] p-6 text-sm text-slate-400">
       {text}
     </div>
   );
@@ -127,7 +133,7 @@ function EmptyState({ text }: { text: string }) {
 
 function ScorePill({ label, value }: { label: string; value: number }) {
   return (
-    <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-slate-300">
+    <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-xs text-slate-300">
       {label}：{value}
     </span>
   );
@@ -142,160 +148,154 @@ function HighValueAnalysisCard({
     analysis.executiveSummary || analysis.conclusion || "暂无摘要";
 
   return (
-    <article className="rounded-3xl border border-emerald-400/20 bg-emerald-400/[0.05] p-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-200">
+    <article className="rounded-3xl border border-white/10 bg-black/15 p-5">
+      <div className="mb-3 flex flex-wrap gap-2">
+        <span className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1 text-xs text-emerald-100">
           高战略价值
         </span>
-        <span className="rounded-full bg-white/[0.06] px-3 py-1 text-xs text-slate-300">
+        <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-xs text-slate-300">
           {formatAnalysisStatus(analysis.status)}
         </span>
       </div>
 
-      <h3 className="mt-4 text-base font-semibold leading-6 text-white">
-        {analysis.title}
-      </h3>
+      <h3 className="text-lg font-semibold text-white">{analysis.title}</h3>
 
-      <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-400">
+      <p className="mt-3 line-clamp-4 text-sm leading-6 text-slate-300">
         {summary}
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
         <ScorePill label="战略价值" value={analysis.strategicValueScore} />
         <ScorePill label="业务相关" value={analysis.businessRelevanceScore} />
-        <ScorePill
-          label="工程成熟"
-          value={analysis.engineeringReadinessScore}
-        />
-        <ScorePill label="采用风险" value={analysis.adoptionRiskScore} />
+        <ScorePill label="工程就绪" value={analysis.engineeringReadinessScore} />
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
-        <span>所属 Radar：{analysis.radar.name}</span>
-        <span>更新：{formatDate(analysis.updatedAt)}</span>
-      </div>
+      <div className="mt-5 flex items-center justify-between gap-4 text-sm">
+        <div className="text-slate-500">
+          <p>所属 Radar：{analysis.radar.name}</p>
+          <p>更新：{formatDate(analysis.updatedAt)}</p>
+        </div>
 
-      <Link
-        href={`/radars/${analysis.radar.id}/workspace`}
-        className="mt-4 inline-flex text-sm font-medium text-cyan-200 hover:text-cyan-100"
-      >
-        进入 Workspace →
-      </Link>
+        <Link
+          className="shrink-0 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-xs text-cyan-100 hover:bg-cyan-300/20"
+          href={`/radars/${analysis.radarId}/workspace`}
+        >
+          进入 Workspace
+        </Link>
+      </div>
     </article>
   );
 }
 
 function RiskAnalysisCard({ analysis }: { analysis: RiskAnalysis }) {
   return (
-    <article className="rounded-3xl border border-amber-400/20 bg-amber-400/[0.05] p-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-full bg-amber-400/10 px-3 py-1 text-xs font-medium text-amber-200">
+    <article className="rounded-3xl border border-rose-300/15 bg-rose-300/[0.05] p-5">
+      <div className="mb-3 flex flex-wrap gap-2">
+        <span className="rounded-full border border-rose-300/30 bg-rose-300/10 px-3 py-1 text-xs text-rose-100">
           风险提醒
         </span>
-        <span className="rounded-full bg-white/[0.06] px-3 py-1 text-xs text-slate-300">
+        <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-xs text-slate-300">
           采用风险：{analysis.adoptionRiskScore}
         </span>
       </div>
 
-      <h3 className="mt-4 text-base font-semibold leading-6 text-white">
-        {analysis.title}
-      </h3>
+      <h3 className="text-lg font-semibold text-white">{analysis.title}</h3>
 
-      <p className="mt-3 text-sm leading-6 text-slate-400">
+      <p className="mt-3 line-clamp-4 text-sm leading-6 text-slate-300">
         {analysis.risk ||
           "该技术采用风险较高，建议在 PoC 前补充验证风险点。"}
       </p>
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
-        <span>所属 Radar：{analysis.radar.name}</span>
-        <span>更新：{formatDate(analysis.updatedAt)}</span>
-      </div>
+      <div className="mt-5 flex items-center justify-between gap-4 text-sm">
+        <div className="text-slate-500">
+          <p>所属 Radar：{analysis.radar.name}</p>
+          <p>更新：{formatDate(analysis.updatedAt)}</p>
+        </div>
 
-      <Link
-        href={`/radars/${analysis.radar.id}/workspace`}
-        className="mt-4 inline-flex text-sm font-medium text-amber-200 hover:text-amber-100"
-      >
-        查看相关分析 →
-      </Link>
+        <Link
+          className="shrink-0 rounded-full border border-white/15 px-4 py-2 text-xs text-slate-200 hover:bg-white/10"
+          href={`/radars/${analysis.radarId}/workspace`}
+        >
+          查看相关分析
+        </Link>
+      </div>
     </article>
   );
 }
 
 function DailyReportCard({ report }: { report: DailyReport }) {
   return (
-    <article className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-full bg-cyan-400/10 px-3 py-1 text-xs font-medium text-cyan-200">
+    <article className="rounded-3xl border border-white/10 bg-black/15 p-5">
+      <div className="mb-3 flex flex-wrap gap-2">
+        <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-xs text-slate-300">
           {formatReportStatus(report.status)}
         </span>
-        <span className="rounded-full bg-white/[0.06] px-3 py-1 text-xs text-slate-300">
+        <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-xs text-slate-300">
           {formatDate(report.reportDate || report.createdAt)}
         </span>
       </div>
 
-      <h3 className="mt-4 text-base font-semibold leading-6 text-white">
-        {report.title}
-      </h3>
+      <h3 className="text-lg font-semibold text-white">{report.title}</h3>
 
-      <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-400">
+      <p className="mt-3 line-clamp-4 text-sm leading-6 text-slate-300">
         {report.summary || "暂无日报摘要"}
       </p>
 
-      <p className="mt-4 text-xs text-slate-500">
-        所属 Radar：{report.radar.name}
-      </p>
+      <div className="mt-5 flex items-center justify-between gap-4 text-sm">
+        <p className="text-slate-500">所属 Radar：{report.radar.name}</p>
 
-      <Link
-        href={`/radars/${report.radar.id}/daily-reports`}
-        className="mt-4 inline-flex text-sm font-medium text-cyan-200 hover:text-cyan-100"
-      >
-        查看日报 →
-      </Link>
+        <Link
+          className="shrink-0 rounded-full border border-white/15 px-4 py-2 text-xs text-slate-200 hover:bg-white/10"
+          href={`/radars/${report.radarId}/daily-reports/${report.id}`}
+        >
+          查看日报
+        </Link>
+      </div>
     </article>
   );
 }
 
 function RadarWorkspaceCard({ radar }: { radar: RadarCard }) {
   return (
-    <article className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/20 backdrop-blur transition hover:border-cyan-300/30 hover:bg-white/[0.06]">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full bg-cyan-400/10 px-3 py-1 text-xs font-medium text-cyan-200">
-            {formatRadarStatus(radar.status)}
-          </span>
-          <span className="rounded-full bg-white/[0.06] px-3 py-1 text-xs text-slate-300">
-            {formatScanIntensity(radar.scanIntensity)}
-          </span>
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              radar.isActive
-                ? "bg-emerald-400/10 text-emerald-200"
-                : "bg-slate-400/10 text-slate-300"
-            }`}
-          >
-            {radar.isActive ? "已启用" : "已停用"}
-          </span>
-        </div>
+    <article className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-xl shadow-black/10">
+      <div className="mb-4 flex flex-wrap gap-2">
+        <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-xs text-slate-300">
+          {formatRadarStatus(radar.status)}
+        </span>
+        <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs text-cyan-100">
+          {formatScanIntensity(radar.scanIntensity)}
+        </span>
+        <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs text-emerald-100">
+          {radar.isActive ? "已启用" : "已停用"}
+        </span>
       </div>
 
-      <h3 className="mt-5 text-lg font-semibold text-white">{radar.name}</h3>
+      <h3 className="text-xl font-semibold text-white">{radar.name}</h3>
 
-      <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-400">
+      <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-300">
         {radar.description || "暂无 Radar 描述"}
       </p>
 
-      <div className="mt-5 space-y-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-300">
-        <div>
+      <div className="mt-5 grid gap-3 text-sm text-slate-400">
+        <p>
           <span className="text-slate-500">业务领域：</span>
           {radar.businessDomain || "未配置"}
-        </div>
-        <div>
+        </p>
+        <p>
           <span className="text-slate-500">关注问题：</span>
           {radar.focusQuestion || "未配置"}
-        </div>
+        </p>
+        <p>
+          <span className="text-slate-500">上次扫描：</span>
+          {formatDate(radar.lastScannedAt)}
+        </p>
+        <p>
+          <span className="text-slate-500">下次扫描：</span>
+          {formatDate(radar.nextScanAt)}
+        </p>
       </div>
 
-      <div className="mt-5 grid grid-cols-5 gap-2 text-center">
+      <div className="mt-5 grid grid-cols-5 gap-2">
         <CountBox label="情报" value={radar._count.intelligenceItems} />
         <CountBox label="分析" value={radar._count.technologyAnalyses} />
         <CountBox label="推荐" value={radar._count.recommendations} />
@@ -303,14 +303,9 @@ function RadarWorkspaceCard({ radar }: { radar: RadarCard }) {
         <CountBox label="日报" value={radar._count.dailyReports} />
       </div>
 
-      <div className="mt-5 grid gap-2 text-xs text-slate-500 sm:grid-cols-2">
-        <p>上次扫描：{formatDate(radar.lastScannedAt)}</p>
-        <p>下次扫描：{formatDate(radar.nextScanAt)}</p>
-      </div>
-
       <Link
+        className="mt-5 inline-flex rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-sm text-cyan-100 hover:bg-cyan-300/20"
         href={`/radars/${radar.id}/workspace`}
-        className="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-cyan-300 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"
       >
         进入 Workspace
       </Link>
@@ -324,63 +319,57 @@ function TopConnectedTechnologyCard({
   technology: TopConnectedTechnology;
 }) {
   return (
-    <Link
-      href={`/radars/${technology.radar.id}/workspace`}
-      className="group rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-xl shadow-black/20 transition hover:border-cyan-300/40 hover:bg-cyan-300/[0.06]"
-    >
-      <div className="flex items-start justify-between gap-3">
+    <article className="rounded-3xl border border-violet-300/15 bg-violet-300/[0.05] p-5">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h3 className="text-lg font-semibold text-white group-hover:text-cyan-100">
-            {technology.name}
-          </h3>
-          <p className="mt-1 text-xs text-cyan-200/80">
+          <h3 className="text-lg font-semibold text-white">{technology.name}</h3>
+          <p className="mt-1 text-sm text-slate-400">
             {technology.category ?? "未分类"}
           </p>
         </div>
 
-        <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-3 py-2 text-right">
-          <p className="text-xs text-cyan-100/80">连接度</p>
-          <p className="text-xl font-semibold text-cyan-100">
+        <div className="rounded-2xl border border-violet-300/20 bg-violet-300/10 px-4 py-3 text-center">
+          <p className="text-xs text-violet-100/80">连接度</p>
+          <p className="text-2xl font-semibold text-white">
             {technology.connectedCount}
           </p>
         </div>
       </div>
 
-      <p className="mt-3 text-sm text-slate-300">
+      <p className="mt-4 text-sm text-slate-400">
         所属 Radar：{technology.radar.name}
       </p>
 
-      {technology.description ? (
-        <p className="mt-3 text-sm leading-6 text-slate-400">
-          {technology.description}
-        </p>
-      ) : (
-        <p className="mt-3 text-sm text-slate-500">暂无技术说明。</p>
-      )}
+      <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-300">
+        {technology.description || "暂无技术说明。"}
+      </p>
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-300">
-        <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1">
+        <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1">
           入向 {technology.incomingCount}
         </span>
-        <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1">
+        <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1">
           出向 {technology.outgoingCount}
         </span>
       </div>
-    </Link>
+    </article>
   );
 }
 
 function CountBox({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-2 py-3">
-      <p className="text-base font-semibold text-white">{value}</p>
-      <p className="mt-1 text-[11px] text-slate-500">{label}</p>
+    <div className="rounded-2xl border border-white/10 bg-black/15 p-3 text-center">
+      <p className="text-lg font-semibold text-white">{value}</p>
+      <p className="mt-1 text-xs text-slate-500">{label}</p>
     </div>
   );
 }
 
 export default async function DashboardPage() {
-  const data = await getDashboardDecisionData();
+  const [data, recentDecisions] = await Promise.all([
+    getDashboardDecisionData(),
+    getRecentDecisionsForDashboard(6),
+  ]);
 
   const decisionSnapshot = [
     {
@@ -423,6 +412,9 @@ export default async function DashboardPage() {
               <span className="rounded-full border border-violet-300/20 bg-violet-300/10 px-4 py-2 text-sm text-violet-100">
                 技术图谱
               </span>
+              <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-4 py-2 text-sm text-amber-100">
+                决策记忆
+              </span>
             </div>
           </div>
 
@@ -433,8 +425,8 @@ export default async function DashboardPage() {
             <div className="mt-6 space-y-4">
               {decisionSnapshot.map((item) => (
                 <div
-                  key={item.label}
                   className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-4"
+                  key={item.label}
                 >
                   <span className="text-sm text-slate-400">{item.label}</span>
                   <span className="text-2xl font-semibold text-white">
@@ -449,8 +441,8 @@ export default async function DashboardPage() {
         <section className="space-y-5">
           <SectionHeader
             eyebrow="Overview"
-            title="核心决策指标"
-            description="从 Radar 覆盖、技术分析、推荐动作与 PoC 进展四个维度观察当前技术决策状态。"
+            title="核心指标总览"
+            description="用真实数据库数据展示 Radar、技术分析、推荐动作与 PoC 的整体状态。"
           />
 
           <div className="grid gap-4 md:grid-cols-3">
@@ -493,8 +485,7 @@ export default async function DashboardPage() {
             <MetricCard
               label="建议 PoC"
               value={
-                data.recommendationOverview
-                  .validateByPocRecommendationTotal
+                data.recommendationOverview.validateByPocRecommendationTotal
               }
               description="推荐动作 actionType 为 VALIDATE_BY_POC。"
             />
@@ -543,6 +534,13 @@ export default async function DashboardPage() {
           </div>
         </section>
 
+        <DecisionHistory
+          decisions={recentDecisions}
+          title="Recent Decisions"
+          emptyText="当前暂无近期技术决策。"
+          showRadar
+        />
+
         <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
           <div className="space-y-5">
             <SectionHeader
@@ -555,10 +553,10 @@ export default async function DashboardPage() {
               <EmptyState text="暂无高价值技术分析。" />
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
-                {data.recentHighValueAnalyses.map((analysis) => (
+                {data.recentHighValueAnalyses.map((analysis: HighValueAnalysis) => (
                   <HighValueAnalysisCard
-                    key={analysis.id}
                     analysis={analysis}
+                    key={analysis.id}
                   />
                 ))}
               </div>
@@ -576,8 +574,8 @@ export default async function DashboardPage() {
               <EmptyState text="暂无高风险技术提醒。" />
             ) : (
               <div className="space-y-4">
-                {data.recentRiskAnalyses.map((analysis) => (
-                  <RiskAnalysisCard key={analysis.id} analysis={analysis} />
+                {data.recentRiskAnalyses.map((analysis: RiskAnalysis) => (
+                  <RiskAnalysisCard analysis={analysis} key={analysis.id} />
                 ))}
               </div>
             )}
@@ -595,7 +593,8 @@ export default async function DashboardPage() {
             <EmptyState text="暂无技术图谱数据。完成 Technology Graph seed 后会在这里显示连接度最高的技术。" />
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {data.topConnectedTechnologies.map((technology) => (
+              {data.topConnectedTechnologies.map(
+                (technology: TopConnectedTechnology) => (
                 <TopConnectedTechnologyCard
                   key={technology.id}
                   technology={technology}
@@ -616,7 +615,7 @@ export default async function DashboardPage() {
             <EmptyState text="暂无日报沉淀。" />
           ) : (
             <div className="grid gap-4 md:grid-cols-3">
-              {data.recentDailyReports.map((report) => (
+              {data.recentDailyReports.map((report: DailyReport) => (
                 <DailyReportCard key={report.id} report={report} />
               ))}
             </div>
@@ -634,7 +633,7 @@ export default async function DashboardPage() {
             <EmptyState text="暂无 Radar。请先通过 seed 或后续创建流程添加 Radar 数据。" />
           ) : (
             <div className="grid gap-5 lg:grid-cols-2">
-              {data.radars.map((radar) => (
+              {data.radars.map((radar: RadarCard) => (
                 <RadarWorkspaceCard key={radar.id} radar={radar} />
               ))}
             </div>
