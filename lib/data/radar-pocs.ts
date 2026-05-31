@@ -26,6 +26,7 @@ export async function getRadarPocListData(radarId: string) {
         objective: true,
         hypothesis: true,
         successCriteria: true,
+        risks: true,
         outcome: true,
         findings: true,
         recommendationBack: true,

@@ -292,10 +292,12 @@ export async function updatePocAction(formData: FormData) {
       id: true,
       ownerId: true,
       radarId: true,
+      recommendationId: true,
       title: true,
       status: true,
       outcome: true,
       findings: true,
+      risks: true,
       recommendationBack: true,
       repoUrl: true,
       demoUrl: true,
@@ -303,6 +305,13 @@ export async function updatePocAction(formData: FormData) {
       startDate: true,
       endDate: true,
       timeSpentHours: true,
+      recommendation: {
+        select: {
+          id: true,
+          title: true,
+          status: true,
+        },
+      },
     },
   });
 
@@ -310,62 +319,123 @@ export async function updatePocAction(formData: FormData) {
     throw new Error("PoC not found.");
   }
 
-  const updatedPoc = await prisma.poC.update({
-    where: { id: existingPoc.id },
-    data: {
-      status,
-      outcome,
-      findings: getOptionalString(formData, "findings"),
-      recommendationBack: getOptionalString(formData, "recommendationBack"),
-      repoUrl: getOptionalString(formData, "repoUrl"),
-      demoUrl: getOptionalString(formData, "demoUrl"),
-      artifactUrl: getOptionalString(formData, "artifactUrl"),
-      startDate: parseOptionalDate(getOptionalString(formData, "startDate")),
-      endDate: parseOptionalDate(getOptionalString(formData, "endDate")),
-      timeSpentHours: parseOptionalDecimal(
-        getOptionalString(formData, "timeSpentHours"),
-      ),
-    },
-    select: {
-      id: true,
-      title: true,
-      status: true,
-      outcome: true,
-      findings: true,
-      recommendationBack: true,
-      repoUrl: true,
-      demoUrl: true,
-      artifactUrl: true,
-      startDate: true,
-      endDate: true,
-      timeSpentHours: true,
-    },
-  });
+  const findings = getOptionalString(formData, "findings");
+  const risks = getOptionalString(formData, "risks");
+  const recommendationBack = getOptionalString(formData, "recommendationBack");
+  const repoUrl = getOptionalString(formData, "repoUrl");
+  const demoUrl = getOptionalString(formData, "demoUrl");
+  const artifactUrl = getOptionalString(formData, "artifactUrl");
+  const startDate = parseOptionalDate(getOptionalString(formData, "startDate"));
+  const endDate = parseOptionalDate(getOptionalString(formData, "endDate"));
+  const timeSpentHours = parseOptionalDecimal(
+    getOptionalString(formData, "timeSpentHours"),
+  );
 
-  await writeActivityLog({
-    ownerId: existingPoc.ownerId,
-    actorId: existingPoc.ownerId,
-    radarId: existingPoc.radarId,
-    entityType: ActivityEntityType.POC,
-    entityId: existingPoc.id,
-    actionType: ActivityActionType.STATUS_CHANGED,
-    message: `更新了 PoC「${existingPoc.title}」的状态与验证结论。`,
-    beforeSnapshot: {
-      status: existingPoc.status,
-      outcome: existingPoc.outcome,
-      findings: existingPoc.findings,
-      recommendationBack: existingPoc.recommendationBack,
-    },
-    afterSnapshot: {
-      status: updatedPoc.status,
-      outcome: updatedPoc.outcome,
-      findings: updatedPoc.findings,
-      recommendationBack: updatedPoc.recommendationBack,
-    },
+  const result = await prisma.$transaction(async (tx) => {
+    const updatedPoc = await tx.poC.update({
+      where: { id: existingPoc.id },
+      data: {
+        status,
+        outcome,
+        findings,
+        risks,
+        recommendationBack,
+        repoUrl,
+        demoUrl,
+        artifactUrl,
+        startDate,
+        endDate,
+        timeSpentHours,
+      },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        outcome: true,
+        findings: true,
+        risks: true,
+        recommendationBack: true,
+        repoUrl: true,
+        demoUrl: true,
+        artifactUrl: true,
+        startDate: true,
+        endDate: true,
+        timeSpentHours: true,
+      },
+    });
+
+    let updatedRecommendation: {
+      id: string;
+      title: string;
+      status: RecommendationStatus;
+    } | null = null;
+
+    if (
+      status === PocStatus.DONE &&
+      existingPoc.recommendation.status !== RecommendationStatus.DONE
+    ) {
+      updatedRecommendation = await tx.recommendation.update({
+        where: { id: existingPoc.recommendationId },
+        data: {
+          status: RecommendationStatus.DONE,
+        },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+        },
+      });
+    }
+
+    await tx.activityLog.create({
+      data: {
+        ownerId: existingPoc.ownerId,
+        actorId: existingPoc.ownerId,
+        radarId: existingPoc.radarId,
+        entityType: ActivityEntityType.POC,
+        entityId: existingPoc.id,
+        actionType: ActivityActionType.STATUS_CHANGED,
+        message:
+          status === PocStatus.DONE
+            ? `完成了 PoC「${existingPoc.title}」，并回写 Recommendation「${existingPoc.recommendation.title}」状态。`
+            : `更新了 PoC「${existingPoc.title}」的验证记录。`,
+        beforeSnapshot: {
+          status: existingPoc.status,
+          outcome: existingPoc.outcome,
+          findings: existingPoc.findings,
+          risks: existingPoc.risks,
+          recommendationBack: existingPoc.recommendationBack,
+          recommendationStatus: existingPoc.recommendation.status,
+        },
+        afterSnapshot: {
+          status: updatedPoc.status,
+          outcome: updatedPoc.outcome,
+          findings: updatedPoc.findings,
+          risks: updatedPoc.risks,
+          recommendationBack: updatedPoc.recommendationBack,
+          recommendationStatus:
+            updatedRecommendation?.status ?? existingPoc.recommendation.status,
+        },
+        metadata: {
+          recommendationId: existingPoc.recommendationId,
+          recommendationUpdated: Boolean(updatedRecommendation),
+        },
+      },
+    });
+
+    return {
+      updatedPoc,
+      updatedRecommendation,
+    };
   });
 
   revalidatePath(`/radars/${radarId}/pocs`);
   revalidatePath(`/radars/${radarId}/pocs/${pocId}`);
   revalidatePath(`/radars/${radarId}/workspace`);
+
+  if (result.updatedRecommendation) {
+    redirect(getPocDetailPath(radarId, pocId, "poc-done-recommendation-updated"));
+  }
+
   redirect(getPocDetailPath(radarId, pocId, "updated"));
 }

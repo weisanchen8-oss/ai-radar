@@ -293,29 +293,42 @@ export default async function RadarPocDetailPage({
               </label>
             </div>
 
-            <label className="grid gap-2">
-              <span className="text-sm font-medium text-slate-200">
-                发现与证据
-              </span>
-              <textarea
-                name="findings"
-                rows={5}
-                defaultValue={poc.findings ?? ""}
-                className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-white outline-none focus:border-cyan-300/50"
-              />
-            </label>
+              <label className="grid gap-2">
+                <span className="text-sm font-medium text-slate-200">
+                  发现与证据
+                </span>
+                <textarea
+                  name="findings"
+                  rows={5}
+                  defaultValue={poc.findings ?? ""}
+                  className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-white outline-none focus:border-cyan-300/50"
+                />
+              </label>
 
-            <label className="grid gap-2">
-              <span className="text-sm font-medium text-slate-200">
-                回写建议
-              </span>
-              <textarea
-                name="recommendationBack"
-                rows={4}
-                defaultValue={poc.recommendationBack ?? ""}
-                className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-white outline-none focus:border-cyan-300/50"
-              />
-            </label>
+              <label className="grid gap-2">
+                <span className="text-sm font-medium text-slate-200">
+                  风险记录
+                </span>
+                <textarea
+                  name="risks"
+                  rows={4}
+                  defaultValue={poc.risks ?? ""}
+                  placeholder="记录验证过程中发现的工程风险、成本风险、数据风险或落地风险。"
+                  className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-white outline-none focus:border-cyan-300/50"
+                />
+              </label>
+            
+              <label className="grid gap-2">
+                <span className="text-sm font-medium text-slate-200">
+                  回写建议
+                </span>
+                <textarea
+                  name="recommendationBack"
+                  rows={4}
+                  defaultValue={poc.recommendationBack ?? ""}
+                  className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-white outline-none focus:border-cyan-300/50"
+                />
+              </label>
 
             <div className="grid gap-4 md:grid-cols-3">
               <label className="grid gap-2">

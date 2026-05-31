@@ -82,6 +82,119 @@ function getStatusTone(status: string) {
   }
 }
 
+function getGroupTone(status: string) {
+  switch (status) {
+    case "IN_PROGRESS":
+      return "border-cyan-300/20 bg-cyan-300/10";
+    case "DONE":
+      return "border-emerald-300/20 bg-emerald-300/10";
+    case "CANCELLED":
+      return "border-slate-300/15 bg-slate-300/5";
+    default:
+      return "border-indigo-300/20 bg-indigo-300/10";
+  }
+}
+
+function TextBlock({
+  title,
+  text,
+}: {
+  title: string;
+  text: string | null;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4">
+      <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+        {title}
+      </p>
+      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-300">
+        {text || "暂无记录"}
+      </p>
+    </div>
+  );
+}
+
+function PocCard({
+  radarId,
+  poc,
+}: {
+  radarId: string;
+  poc: {
+    id: string;
+    title: string;
+    status: string;
+    objective: string;
+    hypothesis: string;
+    successCriteria: string;
+    risks: string | null;
+    outcome: string | null;
+    findings: string | null;
+    recommendationBack: string | null;
+    updatedAt: Date;
+    recommendation: {
+      id: string;
+      title: string;
+      actionType: string;
+      status: string;
+      priority: string | null;
+    };
+  };
+}) {
+  return (
+    <article className="rounded-3xl border border-white/10 bg-slate-950/20 p-5 transition hover:border-cyan-300/30 hover:bg-cyan-300/5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex flex-wrap gap-2">
+            <span
+              className={`rounded-full border px-3 py-1 text-xs ${getStatusTone(
+                poc.status,
+              )}`}
+            >
+              {formatPocStatus(poc.status)}
+            </span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">
+              结论：{formatPocOutcome(poc.outcome)}
+            </span>
+          </div>
+
+          <h3 className="mt-3 text-lg font-semibold text-white">
+            {poc.title}
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-slate-400">
+            关联推荐：{poc.recommendation.title}
+          </p>
+        </div>
+
+        <Link
+          href={`/radars/${radarId}/pocs/${poc.id}`}
+          className="rounded-xl border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-sm font-medium text-cyan-100 hover:bg-cyan-300/20"
+        >
+          查看详情
+        </Link>
+      </div>
+
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <TextBlock title="验证目标" text={poc.objective} />
+        <TextBlock title="验证假设" text={poc.hypothesis} />
+        <TextBlock title="成功标准" text={poc.successCriteria} />
+        <TextBlock title="主要风险" text={poc.risks} />
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <TextBlock title="发现与证据" text={poc.findings} />
+        <TextBlock title="回写建议" text={poc.recommendationBack} />
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4 text-xs text-slate-500">
+        <span>更新时间：{formatDate(poc.updatedAt)}</span>
+        <span>
+          推荐动作：{formatRecommendationAction(poc.recommendation.actionType)}
+        </span>
+      </div>
+    </article>
+  );
+}
+
 export default async function RadarPocListPage({
   params,
   searchParams,
@@ -99,6 +212,29 @@ export default async function RadarPocListPage({
   }
 
   const { radar, pocs, recommendations } = data;
+
+  const groups = [
+    {
+      status: "PLANNED",
+      label: "Planned / 计划中",
+      desc: "已经确定验证方向，但尚未开始执行。",
+    },
+    {
+      status: "IN_PROGRESS",
+      label: "In Progress / 验证中",
+      desc: "正在推进验证，需要持续记录发现和风险。",
+    },
+    {
+      status: "DONE",
+      label: "Done / 已完成",
+      desc: "已经形成验证结论，可用于后续技术沉淀。",
+    },
+    {
+      status: "CANCELLED",
+      label: "Cancelled / 已取消",
+      desc: "验证已终止，需要保留取消原因和风险判断。",
+    },
+  ];
 
   const plannedCount = pocs.filter((item) => item.status === "PLANNED").length;
   const runningCount = pocs.filter(
@@ -121,13 +257,13 @@ export default async function RadarPocListPage({
               ← 返回 Radar Workspace
             </Link>
             <p className="mt-4 text-sm uppercase tracking-[0.24em] text-cyan-200">
-              PoC Validation
+              Rapid Validation
             </p>
             <h1 className="mt-2 text-3xl font-semibold text-white">
-              {radar.name} · PoC 验证
+              {radar.name} · PoC 验证闭环
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
-              第一版只做验证记录和管理，不做自动 Benchmark、自动部署或自动实验。
+              将 Recommendation 转化为可追踪的验证记录，沉淀验证目标、假设、成功标准、风险、发现和最终结论。
             </p>
           </div>
 
@@ -147,10 +283,10 @@ export default async function RadarPocListPage({
 
         <section className="grid gap-4 md:grid-cols-4">
           {[
-            ["计划中", plannedCount, "等待排期"],
-            ["验证中", runningCount, "正在推进"],
-            ["已完成", doneCount, "形成结论"],
-            ["已取消", cancelledCount, "终止验证"],
+            ["计划中", plannedCount, "Planned"],
+            ["验证中", runningCount, "In Progress"],
+            ["已完成", doneCount, "Done"],
+            ["已取消", cancelledCount, "Cancelled"],
           ].map(([label, value, hint]) => (
             <div
               key={label}
@@ -164,11 +300,13 @@ export default async function RadarPocListPage({
         </section>
 
         <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-xl shadow-slate-950/20">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h2 className="text-xl font-semibold text-white">PoC 列表</h2>
+              <h2 className="text-xl font-semibold text-white">
+                PoC 状态看板
+              </h2>
               <p className="mt-1 text-sm text-slate-400">
-                记录每一次技术验证的目标、状态、结论和沉淀结果。
+                按 planned / in_progress / done / cancelled 分组查看验证进展。
               </p>
             </div>
           </div>
@@ -178,47 +316,48 @@ export default async function RadarPocListPage({
               当前 Radar 暂无 PoC。可以从下方 Recommendation 快速创建，也可以手动新建。
             </div>
           ) : (
-            <div className="mt-6 grid gap-4">
-              {pocs.map((poc) => (
-                <Link
-                  key={poc.id}
-                  href={`/radars/${radar.id}/pocs/${poc.id}`}
-                  className="rounded-2xl border border-white/10 bg-slate-950/20 p-5 transition hover:border-cyan-300/30 hover:bg-cyan-300/5"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-semibold text-white">
-                        {poc.title}
-                      </h3>
-                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-300">
-                        {poc.objective || "暂无验证目标"}
-                      </p>
-                    </div>
-                    <span
-                      className={`rounded-full border px-3 py-1 text-xs ${getStatusTone(
-                        poc.status,
-                      )}`}
-                    >
-                      {formatPocStatus(poc.status)}
-                    </span>
-                  </div>
+            <div className="mt-6 grid gap-6">
+              {groups.map((group) => {
+                const groupPocs = pocs.filter(
+                  (poc) => poc.status === group.status,
+                );
 
-                  <div className="mt-4 grid gap-3 text-sm text-slate-400 md:grid-cols-3">
-                    <div>
-                      <span className="text-slate-500">验证结论：</span>
-                      {formatPocOutcome(poc.outcome)}
+                return (
+                  <section
+                    key={group.status}
+                    className={`rounded-3xl border p-5 ${getGroupTone(
+                      group.status,
+                    )}`}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-lg font-semibold text-white">
+                          {group.label}
+                        </h3>
+                        <p className="mt-1 text-sm text-slate-400">
+                          {group.desc}
+                        </p>
+                      </div>
+
+                      <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">
+                        {groupPocs.length} 个
+                      </span>
                     </div>
-                    <div>
-                      <span className="text-slate-500">关联推荐：</span>
-                      {poc.recommendation.title}
-                    </div>
-                    <div>
-                      <span className="text-slate-500">更新时间：</span>
-                      {formatDate(poc.updatedAt)}
-                    </div>
-                  </div>
-                </Link>
-              ))}
+
+                    {groupPocs.length === 0 ? (
+                      <div className="mt-4 rounded-2xl border border-dashed border-white/15 bg-slate-950/20 p-5 text-sm text-slate-500">
+                        当前分组暂无 PoC。
+                      </div>
+                    ) : (
+                      <div className="mt-4 grid gap-4">
+                        {groupPocs.map((poc) => (
+                          <PocCard key={poc.id} radarId={radar.id} poc={poc} />
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
             </div>
           )}
         </section>
@@ -228,7 +367,7 @@ export default async function RadarPocListPage({
             从 Recommendation 创建 PoC
           </h2>
           <p className="mt-1 text-sm text-slate-400">
-            推荐动作不只是展示结论，而是可以直接转入验证记录。
+            推荐动作不只是展示结论，而是可以直接进入验证记录。
           </p>
 
           {recommendations.length === 0 ? (
@@ -251,6 +390,9 @@ export default async function RadarPocListPage({
                           )}
                         </span>
                         <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">
+                          状态：{recommendation.status}
+                        </span>
+                        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">
                           优先级：{formatPriority(recommendation.priority)}
                         </span>
                       </div>
@@ -259,7 +401,9 @@ export default async function RadarPocListPage({
                         {recommendation.title}
                       </h3>
                       <p className="mt-2 text-sm leading-6 text-slate-300">
-                        {recommendation.summary || recommendation.rationale}
+                        {recommendation.summary ||
+                          recommendation.rationale ||
+                          "暂无推荐摘要"}
                       </p>
                     </div>
 
