@@ -175,7 +175,7 @@ function HighValueAnalysisCard({
       </div>
 
       <Link
-        href={`/radars/${analysis.radarId}/workspace`}
+        href={`/radars/${analysis.radar.id}/workspace`}
         className="mt-4 inline-flex text-sm font-medium text-cyan-200 hover:text-cyan-100"
       >
         进入 Workspace →
@@ -211,7 +211,7 @@ function RiskAnalysisCard({ analysis }: { analysis: RiskAnalysis }) {
       </div>
 
       <Link
-        href={`/radars/${analysis.radarId}/workspace`}
+        href={`/radars/${analysis.radar.id}/workspace`}
         className="mt-4 inline-flex text-sm font-medium text-amber-200 hover:text-amber-100"
       >
         查看相关分析 →
@@ -245,7 +245,7 @@ function DailyReportCard({ report }: { report: DailyReport }) {
       </p>
 
       <Link
-        href={`/radars/${report.radarId}/daily-reports`}
+        href={`/radars/${report.radar.id}/daily-reports`}
         className="mt-4 inline-flex text-sm font-medium text-cyan-200 hover:text-cyan-100"
       >
         查看日报 →
