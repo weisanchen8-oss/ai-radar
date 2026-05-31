@@ -116,6 +116,12 @@ enum DailyReportStatus {
   PUBLISHED
 }
 
+enum KnowledgeArticleStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 enum ActivityEntityType {
   RADAR
   INTELLIGENCE_ITEM
@@ -178,6 +184,7 @@ model User {
   ownedTechnologyRelations TechnologyRelation[] @relation("TechnologyRelationOwner")
   ownedActivityLogs        ActivityLog[]        @relation("ActivityLogOwner")
   actedActivityLogs        ActivityLog[]        @relation("ActivityLogActor")
+  ownedKnowledgeArticles   KnowledgeArticle[]   @relation("KnowledgeArticleOwner")
 
   @@index([organizationId])
 }
@@ -215,6 +222,7 @@ model Radar {
   technologyRelations TechnologyRelation[]
   activityLogs        ActivityLog[]
   decisionTimelines   DecisionTimeline[]
+  knowledgeArticles   KnowledgeArticle[]
 
   @@unique([ownerId, slug])
   @@index([ownerId])
@@ -293,6 +301,7 @@ model TechnologyAnalysis {
   sourceRefs        AnalysisSourceRef[]
   recommendations   Recommendation[]
   decisionTimelines DecisionTimeline[]
+  knowledgeArticles KnowledgeArticle[]  @relation("KnowledgeArticleSourceAnalysis")
 
   @@index([ownerId])
   @@index([radarId])
@@ -383,6 +392,7 @@ model PoC {
   owner             User               @relation("PoCOwner", fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   radar             Radar              @relation(fields: [radarId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   recommendation    Recommendation     @relation(fields: [recommendationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  knowledgeArticles KnowledgeArticle[] @relation("KnowledgeArticleSourcePoc")
   decisionTimelines DecisionTimeline[]
 
   @@index([ownerId])
@@ -484,6 +494,37 @@ model TechnologyRelation {
   @@index([targetNodeId])
   @@index([relationType])
   @@index([radarId, relationType])
+}
+
+model KnowledgeArticle {
+  id               String                 @id @default(cuid())
+  ownerId          String
+  radarId          String?
+  organizationId   String?
+  visibility       Visibility             @default(PRIVATE)
+  title            String
+  slug             String
+  summary          String?
+  content          String
+  category         String?
+  tags             String[]               @default([])
+  sourceAnalysisId String?                @unique
+  sourcePocId      String?                @unique
+  status           KnowledgeArticleStatus @default(DRAFT)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  owner          User                @relation("KnowledgeArticleOwner", fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  radar          Radar?              @relation(fields: [radarId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  sourceAnalysis TechnologyAnalysis? @relation("KnowledgeArticleSourceAnalysis", fields: [sourceAnalysisId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  sourcePoc      PoC?                @relation("KnowledgeArticleSourcePoc", fields: [sourcePocId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@unique([ownerId, slug])
+  @@index([ownerId])
+  @@index([radarId])
+  @@index([status])
+  @@index([category])
+  @@index([createdAt])
 }
 
 model ActivityLog {

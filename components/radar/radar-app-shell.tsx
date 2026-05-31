@@ -1,10 +1,10 @@
 // 页面 Shell 组件：统一 AI 技术雷达页面背景、内容宽度与顶部导航。
 import type { ReactNode } from "react";
-import { RadarTopNav } from "@/components/radar/radar-top-nav";
+import { RadarTopNav, type RadarNavKey } from "@/components/radar/radar-top-nav";
 
 type RadarAppShellProps = {
-  activeKey?: "dashboard" | "workspace" | "radars" | "reports";
-  children: ReactNode;
+  activeKey?: RadarNavKey;
+  children: React.ReactNode;
 };
 
 export function RadarAppShell({ activeKey, children }: RadarAppShellProps) {

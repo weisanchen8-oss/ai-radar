@@ -1,7 +1,12 @@
 // 顶部导航组件：统一 AI 技术雷达产品标识与基础导航入口。
 import Link from "next/link";
 
-type RadarNavKey = "dashboard" | "workspace" | "radars" | "reports";
+export type RadarNavKey =
+  | "dashboard"
+  | "workspace"
+  | "radars"
+  | "reports"
+  | "knowledge";
 
 type RadarTopNavProps = {
   activeKey?: RadarNavKey;
@@ -11,6 +16,7 @@ const navItems: Array<{ key: RadarNavKey; label: string; href: string }> = [
   { key: "dashboard", label: "Dashboard", href: "/dashboard" },
   { key: "radars", label: "Radars", href: "/dashboard" },
   { key: "reports", label: "Reports", href: "/dashboard" },
+  { key: "knowledge", label: "Knowledge", href: "/knowledge" },
 ];
 
 export function RadarTopNav({ activeKey }: RadarTopNavProps) {
