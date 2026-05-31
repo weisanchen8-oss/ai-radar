@@ -7,6 +7,10 @@ import {
   markIntelligenceIrrelevantAction,
   observeIntelligenceAction,
 } from "@/app/radars/[radarId]/workspace/actions";
+import {
+  hasTechnologyGraphLite,
+  parseTechnologyGraphLite,
+} from "@/lib/technology-graph";
 
 type WorkspaceData = NonNullable<
   Awaited<ReturnType<typeof getRadarWorkspaceData>>
@@ -364,61 +368,79 @@ export function RadarWorkspaceView({ data, actionMessage }: RadarWorkspaceViewPr
         )}
       </Section>
 
-      <Section title="TechnologyAnalysis" desc="展示 TERA 七项评分、执行摘要、机会、风险和结论。">
+      <Section
+        title="TechnologyAnalysis"
+        desc="展示 TERA 七项评分、执行摘要、机会、风险、结论与轻量技术图谱。"
+      >
         {recentAnalyses.length === 0 ? (
           <EmptyState text="当前暂无技术分析。" />
         ) : (
           <div className="grid gap-4">
-            {recentAnalyses.map((analysis) => (
-              <article
-                key={analysis.id}
-                className="rounded-3xl border border-white/10 bg-black/15 p-5"
-              >
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div>
-                    <div className="mb-3 flex flex-wrap gap-2">
-                      <Pill tone={statusTone(analysis.status)}>
-                        {mapValue(analysis.status, {
-                          DRAFT: "草稿",
-                          GENERATED: "已生成",
-                          REVIEWED: "已复核",
-                          APPROVED: "已确认",
-                          SUPERSEDED: "已替代",
-                        })}
-                      </Pill>
-                      <Pill>
-                        {mapValue(analysis.analysisType, {
-                          AI_GENERATED: "AI 生成",
-                          HUMAN_AUTHORED: "人工撰写",
-                          HYBRID: "混合模式",
-                        })}
-                      </Pill>
+            {recentAnalyses.map((analysis) => {
+              const graphLite = parseTechnologyGraphLite(analysis.metadata);
+              const hasGraphLite = hasTechnologyGraphLite(graphLite);
+
+              return (
+                <article
+                  key={analysis.id}
+                  className="rounded-3xl border border-white/10 bg-black/15 p-5"
+                >
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <div className="mb-3 flex flex-wrap gap-2">
+                        <Pill tone={statusTone(analysis.status)}>
+                          {mapValue(analysis.status, {
+                            DRAFT: "草稿",
+                            GENERATED: "已生成",
+                            REVIEWED: "已复核",
+                            APPROVED: "已确认",
+                            SUPERSEDED: "已替代",
+                          })}
+                        </Pill>
+                        <Pill>
+                          {mapValue(analysis.analysisType, {
+                            AI_GENERATED: "AI 生成",
+                            HUMAN_AUTHORED: "人工撰写",
+                            HYBRID: "混合模式",
+                          })}
+                        </Pill>
+                      </div>
+                      <h3 className="text-lg font-semibold text-white">
+                        {analysis.title}
+                      </h3>
                     </div>
-                    <h3 className="text-lg font-semibold text-white">{analysis.title}</h3>
+                    <p className="text-sm text-slate-400">
+                      更新于 {formatDate(analysis.updatedAt, true)}
+                    </p>
                   </div>
-                  <p className="text-sm text-slate-400">
-                    更新于 {formatDate(analysis.updatedAt, true)}
-                  </p>
-                </div>
-
-                <div className="mt-5 grid gap-3 md:grid-cols-7">
-                  <Score label="来源可信" value={analysis.sourceTrustScore} />
-                  <Score label="技术价值" value={analysis.technicalValueScore} />
-                  <Score label="工程就绪" value={analysis.engineeringReadinessScore} />
-                  <Score label="业务相关" value={analysis.businessRelevanceScore} />
-                  <Score label="采用风险" value={analysis.adoptionRiskScore} />
-                  <Score label="战略价值" value={analysis.strategicValueScore} />
-                  <Score label="社区热度" value={analysis.communityHeatScore} />
-                </div>
-
-                <div className="mt-5 grid gap-4 md:grid-cols-2">
-                  <TextPanel title="Executive Summary" text={analysis.executiveSummary} />
-                  <TextPanel title="Opportunity" text={analysis.opportunity} />
-                  <TextPanel title="Risk" text={analysis.risk} />
-                  <TextPanel title="Conclusion" text={analysis.conclusion} />
-                </div>
-              </article>
-            ))}
+      
+                  <div className="mt-5 grid gap-3 md:grid-cols-7">
+                    <Score label="来源可信" value={analysis.sourceTrustScore} />
+                    <Score label="技术价值" value={analysis.technicalValueScore} />
+                    <Score label="工程就绪" value={analysis.engineeringReadinessScore} />
+                    <Score label="业务相关" value={analysis.businessRelevanceScore} />
+                    <Score label="采用风险" value={analysis.adoptionRiskScore} />
+                    <Score label="战略价值" value={analysis.strategicValueScore} />
+                    <Score label="社区热度" value={analysis.communityHeatScore} />
+                  </div>
+      
+                  <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <TextPanel
+                      title="Executive Summary"
+                      text={analysis.executiveSummary}
+                    />
+                    <TextPanel title="Opportunity" text={analysis.opportunity} />
+                    <TextPanel title="Risk" text={analysis.risk} />
+                    <TextPanel title="Conclusion" text={analysis.conclusion} />
+                  </div>
+      
+                  <GraphLitePanel
+                    graphLite={graphLite}
+                    hasGraphLite={hasGraphLite}
+                  />
+                </article>
+              );
+            })}
           </div>
         )}
       </Section>
@@ -641,6 +663,117 @@ function TextPanel({ title, text }: { title: string; text?: string | null }) {
       <p className="mt-2 text-sm leading-6 text-slate-200">
         {text || "暂无内容。"}
       </p>
+    </div>
+  );
+}
+
+function GraphLitePanel({
+  graphLite,
+  hasGraphLite,
+}: {
+  graphLite: {
+    relatedTechnologies: string[];
+    alternativeTechnologies: string[];
+    dependencyTechnologies: string[];
+    technologyRoute: string;
+    graphNote: string;
+  };
+  hasGraphLite: boolean;
+}) {
+  return (
+    <div className="mt-5 rounded-3xl border border-cyan-400/15 bg-cyan-400/5 p-5">
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200/80">
+            Technology Graph Lite
+          </p>
+          <h4 className="mt-2 text-base font-semibold text-white">
+            轻量技术关联
+          </h4>
+          <p className="mt-1 text-sm leading-6 text-slate-400">
+            用于沉淀相关技术、替代方案、依赖技术和所属技术路线，作为后续正式 Technology Graph 的基础。
+          </p>
+        </div>
+
+        <span className="w-fit rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-medium text-cyan-100">
+          Graph Lite
+        </span>
+      </div>
+
+      {hasGraphLite ? (
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          {graphLite.technologyRoute ? (
+            <div className="rounded-2xl border border-white/10 bg-black/15 p-4 md:col-span-2">
+              <p className="text-xs font-medium text-slate-400">
+                所属技术路线
+              </p>
+              <p className="mt-2 text-sm font-semibold text-white">
+                {graphLite.technologyRoute}
+              </p>
+            </div>
+          ) : null}
+
+          {graphLite.relatedTechnologies.length > 0 ? (
+            <GraphLiteTagGroup
+              title="相关技术"
+              items={graphLite.relatedTechnologies}
+            />
+          ) : null}
+
+          {graphLite.alternativeTechnologies.length > 0 ? (
+            <GraphLiteTagGroup
+              title="替代技术"
+              items={graphLite.alternativeTechnologies}
+            />
+          ) : null}
+
+          {graphLite.dependencyTechnologies.length > 0 ? (
+            <GraphLiteTagGroup
+              title="依赖技术"
+              items={graphLite.dependencyTechnologies}
+            />
+          ) : null}
+
+          {graphLite.graphNote ? (
+            <div className="rounded-2xl border border-white/10 bg-black/15 p-4 md:col-span-2">
+              <p className="text-xs font-medium text-slate-400">图谱备注</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                {graphLite.graphNote}
+              </p>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="mt-5 rounded-2xl border border-dashed border-white/10 bg-black/10 p-4">
+          <p className="text-sm leading-6 text-slate-400">
+            当前分析暂未沉淀技术关系。后续可由 AI 分析或人工整理写入 metadata.graphLite。
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GraphLiteTagGroup({
+  title,
+  items,
+}: {
+  title: string;
+  items: string[];
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/15 p-4">
+      <p className="text-xs font-medium text-slate-400">{title}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {items.map((item) => (
+          <span
+            key={item}
+            className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-medium text-slate-200"
+          >
+            {item}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

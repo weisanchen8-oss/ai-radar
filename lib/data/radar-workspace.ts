@@ -55,6 +55,7 @@ const analysisSelect = {
   adoptionRiskScore: true,
   strategicValueScore: true,
   communityHeatScore: true,
+  metadata: true,
   createdAt: true,
   updatedAt: true,
 } as const;
