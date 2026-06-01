@@ -45,6 +45,70 @@ export async function getDashboardDecisionData() {
       }),
       prisma.recommendation.count({
         where: {
+          status: "OPEN",
+        },
+      }),
+      prisma.recommendation.count({
+        where: {
+          status: "ACCEPTED",
+          pocs: {
+            none: {},
+          },
+        },
+      }),
+      prisma.recommendation.count({
+        where: {
+          status: "ACCEPTED",
+          pocs: {
+            some: {},
+          },
+        },
+      }),
+      prisma.recommendation.count({
+        where: {
+          status: "DONE",
+        },
+      }),
+      prisma.recommendation.count({
+        where: {
+          status: "REJECTED",
+        },
+      }),
+
+      prisma.recommendation.findMany({
+        orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+        take: 6,
+        select: {
+          id: true,
+          radarId: true,
+          title: true,
+          summary: true,
+          actionType: true,
+          status: true,
+          priority: true,
+          updatedAt: true,
+          radar: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          pocs: {
+            select: {
+              id: true,
+              title: true,
+              status: true,
+            },
+            orderBy: {
+              updatedAt: "desc",
+            },
+            take: 1,
+          },
+        },
+      }),
+
+      prisma.recommendation.count({
+        where: {
           actionType: "WATCH",
         },
       }),
@@ -199,6 +263,14 @@ export async function getDashboardDecisionData() {
     pendingReviewAnalysisTotal,
 
     validateByPocRecommendationTotal,
+
+    openRecommendationTotal,
+    acceptedRecommendationTotal,
+    pocRecommendationTotal,
+    doneRecommendationTotal,
+    rejectedRecommendationTotal,
+    recentPipelineRecommendations,
+
     watchRecommendationTotal,
     rejectForNowRecommendationTotal,
     needMoreInfoRecommendationTotal,
@@ -230,6 +302,14 @@ export async function getDashboardDecisionData() {
       watchRecommendationTotal,
       rejectForNowRecommendationTotal,
       needMoreInfoRecommendationTotal,
+    },
+    decisionPipeline: {
+      openRecommendationTotal,
+      acceptedRecommendationTotal,
+      pocRecommendationTotal,
+      doneRecommendationTotal,
+      rejectedRecommendationTotal,
+      recentPipelineRecommendations,
     },
     pocOverview: {
       plannedPocTotal,

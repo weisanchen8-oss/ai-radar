@@ -152,6 +152,17 @@ enum ActivityActionType {
   ARCHIVED
 }
 
+enum DecisionTimelineEventType {
+  RECOMMENDATION_OPENED
+  RECOMMENDATION_ACCEPTED
+  RECOMMENDATION_REJECTED
+  RECOMMENDATION_POC_CREATED
+  RECOMMENDATION_DONE
+  POC_STARTED
+  POC_DONE
+  NOTE
+}
+
 enum DecisionType {
   ANALYZED
   RECOMMENDED
@@ -184,6 +195,7 @@ model User {
   ownedTechnologyRelations TechnologyRelation[] @relation("TechnologyRelationOwner")
   ownedActivityLogs        ActivityLog[]        @relation("ActivityLogOwner")
   actedActivityLogs        ActivityLog[]        @relation("ActivityLogActor")
+  ownedDecisionTimelines   DecisionTimeline[]   @relation("DecisionTimelineOwner")
   ownedKnowledgeArticles   KnowledgeArticle[]   @relation("KnowledgeArticleOwner")
 
   @@index([organizationId])
@@ -300,7 +312,7 @@ model TechnologyAnalysis {
   radar             Radar               @relation(fields: [radarId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   sourceRefs        AnalysisSourceRef[]
   recommendations   Recommendation[]
-  decisionTimelines DecisionTimeline[]
+  decisionTimelines DecisionTimeline[]  @relation("DecisionTimelineSourceAnalysis")
   knowledgeArticles KnowledgeArticle[]  @relation("KnowledgeArticleSourceAnalysis")
 
   @@index([ownerId])
@@ -349,10 +361,11 @@ model Recommendation {
   createdAt       DateTime                 @default(now())
   updatedAt       DateTime                 @updatedAt
 
-  owner    User               @relation("RecommendationOwner", fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  radar    Radar              @relation(fields: [radarId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  analysis TechnologyAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  pocs     PoC[]
+  owner             User               @relation("RecommendationOwner", fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  radar             Radar              @relation(fields: [radarId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  analysis          TechnologyAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  pocs              PoC[]
+  decisionTimelines DecisionTimeline[] @relation("DecisionTimelineRecommendation")
 
   @@index([ownerId])
   @@index([radarId])
@@ -393,7 +406,7 @@ model PoC {
   radar             Radar              @relation(fields: [radarId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   recommendation    Recommendation     @relation(fields: [recommendationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   knowledgeArticles KnowledgeArticle[] @relation("KnowledgeArticleSourcePoc")
-  decisionTimelines DecisionTimeline[]
+  decisionTimelines DecisionTimeline[] @relation("DecisionTimelineSourcePoc")
 
   @@index([ownerId])
   @@index([radarId])
@@ -556,22 +569,41 @@ model ActivityLog {
 }
 
 model DecisionTimeline {
-  id               String       @id @default(cuid())
-  radarId          String
-  technologyName   String
-  decisionType     DecisionType
-  summary          String
-  reason           String
+  id String @id @default(cuid())
+
+  // 通用归属
+  ownerId String?
+  radarId String
+
+  // 新版 Recommendation 工作流字段
+  recommendationId String?
+  eventType        DecisionTimelineEventType?
+  title            String?
+  description      String?
+  fromStatus       RecommendationStatus?
+  toStatus         RecommendationStatus?
+  metadata         Json?
+
+  // 旧版 Radar Memory 兼容字段
+  technologyName   String?
+  decisionType     DecisionType?
+  summary          String?
+  reason           String?
   sourceAnalysisId String?
   sourcePocId      String?
-  createdAt        DateTime     @default(now())
 
+  createdAt DateTime @default(now())
+
+  owner          User?               @relation("DecisionTimelineOwner", fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   radar          Radar               @relation(fields: [radarId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  sourceAnalysis TechnologyAnalysis? @relation(fields: [sourceAnalysisId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  sourcePoc      PoC?                @relation(fields: [sourcePocId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  recommendation Recommendation?     @relation("DecisionTimelineRecommendation", fields: [recommendationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  sourceAnalysis TechnologyAnalysis? @relation("DecisionTimelineSourceAnalysis", fields: [sourceAnalysisId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  sourcePoc      PoC?                @relation("DecisionTimelineSourcePoc", fields: [sourcePocId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
+  @@index([ownerId])
   @@index([radarId])
-  @@index([technologyName])
+  @@index([recommendationId])
+  @@index([eventType])
   @@index([decisionType])
   @@index([sourceAnalysisId])
   @@index([sourcePocId])

@@ -22,6 +22,15 @@ type RiskAnalysis = DashboardDecisionData["recentRiskAnalyses"][number];
 type DailyReport = DashboardDecisionData["recentDailyReports"][number];
 type TopConnectedTechnology =
   DashboardDecisionData["topConnectedTechnologies"][number];
+type PipelineRecommendation =
+  DashboardDecisionData["decisionPipeline"]["recentPipelineRecommendations"][number];
+
+type PipelineStage = {
+  key: "OPEN" | "ACCEPTED" | "POC" | "DONE" | "REJECTED";
+  label: string;
+  value: number;
+  description: string;
+};
 
 function formatDate(value: Date | string | null | undefined) {
   if (!value) {
@@ -255,6 +264,111 @@ function DailyReportCard({ report }: { report: DailyReport }) {
   );
 }
 
+function formatRecommendationStatus(status: string) {
+  const statusMap: Record<string, string> = {
+    OPEN: "待处理",
+    ACCEPTED: "已接受",
+    REJECTED: "已拒绝",
+    DONE: "已完成",
+  };
+
+  return statusMap[status] ?? status;
+}
+
+function formatRecommendationActionType(actionType: string) {
+  const actionTypeMap: Record<string, string> = {
+    WATCH: "持续观察",
+    VALIDATE_BY_POC: "建议 PoC",
+    ADOPT_INCREMENTALLY: "逐步采用",
+    REJECT_FOR_NOW: "暂不推荐",
+    NEED_MORE_INFO: "需要更多信息",
+  };
+
+  return actionTypeMap[actionType] ?? actionType;
+}
+
+function pipelineStageTone(stage: PipelineStage["key"]) {
+  switch (stage) {
+    case "OPEN":
+      return "border-amber-300/30 bg-amber-300/10 text-amber-100";
+    case "ACCEPTED":
+      return "border-cyan-300/30 bg-cyan-300/10 text-cyan-100";
+    case "POC":
+      return "border-violet-300/30 bg-violet-300/10 text-violet-100";
+    case "DONE":
+      return "border-emerald-300/30 bg-emerald-300/10 text-emerald-100";
+    case "REJECTED":
+      return "border-rose-300/30 bg-rose-300/10 text-rose-100";
+    default:
+      return "border-white/10 bg-white/[0.06] text-slate-300";
+  }
+}
+
+function PipelineStageCard({ stage }: { stage: PipelineStage }) {
+  return (
+    <div
+      className={`rounded-3xl border p-5 shadow-xl shadow-black/10 ${pipelineStageTone(
+        stage.key,
+      )}`}
+    >
+      <p className="text-sm opacity-80">{stage.label}</p>
+      <p className="mt-3 text-3xl font-semibold text-white">{stage.value}</p>
+      <p className="mt-3 text-sm leading-6 opacity-80">{stage.description}</p>
+    </div>
+  );
+}
+
+function PipelineRecommendationCard({
+  recommendation,
+}: {
+  recommendation: PipelineRecommendation;
+}) {
+  const activePoc = recommendation.pocs[0];
+
+  return (
+    <article className="rounded-3xl border border-white/10 bg-black/15 p-5">
+      <div className="mb-3 flex flex-wrap gap-2">
+        <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs text-cyan-100">
+          {formatRecommendationActionType(recommendation.actionType)}
+        </span>
+        <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-xs text-slate-300">
+          {formatRecommendationStatus(recommendation.status)}
+        </span>
+        {activePoc ? (
+          <span className="rounded-full border border-violet-300/20 bg-violet-300/10 px-3 py-1 text-xs text-violet-100">
+            已进入 PoC
+          </span>
+        ) : null}
+      </div>
+
+      <h3 className="text-lg font-semibold text-white">
+        {recommendation.title}
+      </h3>
+
+      <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-300">
+        {recommendation.summary || "暂无推荐摘要。"}
+      </p>
+
+      {activePoc ? (
+        <p className="mt-3 text-sm text-violet-100/80">
+          关联 PoC：{activePoc.title} / {activePoc.status}
+        </p>
+      ) : null}
+
+      <div className="mt-5 flex items-center justify-between gap-4 text-sm">
+        <p className="text-slate-500">所属 Radar：{recommendation.radar.name}</p>
+
+        <Link
+          className="shrink-0 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-xs text-cyan-100 hover:bg-cyan-300/20"
+          href={`/radars/${recommendation.radarId}/workspace`}
+        >
+          进入 Workspace
+        </Link>
+      </div>
+    </article>
+  );
+}
+
 function RadarWorkspaceCard({ radar }: { radar: RadarCard }) {
   return (
     <article className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-xl shadow-black/10">
@@ -383,6 +497,39 @@ export default async function DashboardPage() {
     {
       label: "进行中 PoC",
       value: data.pocOverview.inProgressPocTotal,
+    },
+  ];
+
+  const pipelineStages: PipelineStage[] = [
+    {
+      key: "OPEN",
+      label: "OPEN / 待处理",
+      value: data.decisionPipeline.openRecommendationTotal,
+      description: "已生成但尚未接受或拒绝的 Recommendation。",
+    },
+    {
+      key: "ACCEPTED",
+      label: "ACCEPTED / 已接受",
+      value: data.decisionPipeline.acceptedRecommendationTotal,
+      description: "已接受，但尚未创建 PoC 的 Recommendation。",
+    },
+    {
+      key: "POC",
+      label: "POC / 验证中",
+      value: data.decisionPipeline.pocRecommendationTotal,
+      description: "已接受且已经进入 PoC 验证的 Recommendation。",
+    },
+    {
+      key: "DONE",
+      label: "DONE / 已完成",
+      value: data.decisionPipeline.doneRecommendationTotal,
+      description: "已经完成决策闭环的 Recommendation。",
+    },
+    {
+      key: "REJECTED",
+      label: "REJECTED / 已拒绝",
+      value: data.decisionPipeline.rejectedRecommendationTotal,
+      description: "被明确拒绝，暂不继续投入的 Recommendation。",
     },
   ];
 
@@ -531,6 +678,48 @@ export default async function DashboardPage() {
               value={data.pocOverview.cancelledPocTotal}
               description="PoC 状态为 CANCELLED。"
             />
+          </div>
+        </section>
+
+        <section className="space-y-5">
+          <SectionHeader
+            eyebrow="Decision Pipeline"
+            title="Recommendation 决策管线"
+            description="跟踪推荐动作从待处理、接受、进入 PoC、完成或拒绝的流转状态。"
+          />
+
+          <div className="grid gap-4 md:grid-cols-5">
+            {pipelineStages.map((stage) => (
+              <PipelineStageCard key={stage.key} stage={stage} />
+            ))}
+          </div>
+
+          <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-6">
+            <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+              <div>
+                <h3 className="text-xl font-semibold text-white">
+                  最近 Recommendation 流转
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  展示最近更新的推荐动作，帮助判断哪些技术已经进入验证或完成闭环。
+                </p>
+              </div>
+            </div>
+
+            {data.decisionPipeline.recentPipelineRecommendations.length === 0 ? (
+              <EmptyState text="暂无 Recommendation 流转记录。" />
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {data.decisionPipeline.recentPipelineRecommendations.map(
+                  (recommendation: PipelineRecommendation) => (
+                    <PipelineRecommendationCard
+                      key={recommendation.id}
+                      recommendation={recommendation}
+                    />
+                  ),
+                )}
+              </div>
+            )}
           </div>
         </section>
 

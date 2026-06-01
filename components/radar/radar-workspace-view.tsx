@@ -8,6 +8,11 @@ import {
   observeIntelligenceAction,
 } from "@/app/radars/[radarId]/workspace/actions";
 import {
+  acceptRecommendationAction,
+  completeRecommendationAction,
+  rejectRecommendationAction,
+} from "@/app/radars/[radarId]/recommendations/actions";
+import {
   hasTechnologyGraphLite,
   parseTechnologyGraphLite,
 } from "@/lib/technology-graph";
@@ -156,6 +161,10 @@ function getActionMessage(action?: string) {
     "poc-created": "已创建 PoC，可在 PoC 页面继续补充验证计划。",
     favorited: "已收藏，该操作已写入活动记录。",
     "marked-irrelevant": "已标记不相关，该操作已写入活动记录。",
+    "recommendation-accepted": "已接受 Recommendation，下一步可以创建 PoC 进行快速验证。",
+    "recommendation-rejected": "已拒绝 Recommendation，系统已记录本次决策。",
+    "recommendation-done": "已完成 Recommendation，系统已记录本次决策闭环。",
+    "recommendation-updated": "Recommendation 状态已更新。",
   };
 
   return action ? map[action] : undefined;
@@ -483,12 +492,21 @@ export function RadarWorkspaceView({ data, actionMessage }: RadarWorkspaceViewPr
         title="Recommendation"
         desc="展示推荐动作，并提供进入 PoC 或创建 PoC 的工作入口。"
         action={
-          <Link
-            className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-sm text-cyan-100 hover:bg-cyan-300/20"
-            href={`/radars/${radar.id}/pocs/new`}
-          >
-            新建 PoC
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              className="rounded-full border border-white/15 px-4 py-2 text-sm text-slate-200 hover:bg-white/10"
+              href={`/radars/${radar.id}/recommendations`}
+            >
+              查看全部 Recommendation
+            </Link>
+        
+            <Link
+              className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-sm text-cyan-100 hover:bg-cyan-300/20"
+              href={`/radars/${radar.id}/pocs/new`}
+            >
+              新建 PoC
+            </Link>
+          </div>
         }
       >
         {recentRecommendations.length === 0 ? (
@@ -545,13 +563,48 @@ export function RadarWorkspaceView({ data, actionMessage }: RadarWorkspaceViewPr
                 </div>
 
                 <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">
-                  <Link
-                    className="rounded-full border border-cyan-300/40 bg-cyan-300/15 px-4 py-2 text-xs font-medium text-cyan-100 transition hover:bg-cyan-300/25"
-                    href={`/radars/${radar.id}/pocs/new?recommendationId=${recommendation.id}`}
-                  >
-                    创建 PoC
-                  </Link>
-
+                  {recommendation.status === "OPEN" ? (
+                    <>
+                      <FormButton
+                        action={acceptRecommendationAction}
+                        radarId={radar.id}
+                        itemId={recommendation.id}
+                        variant="primary"
+                      >
+                        接受
+                      </FormButton>
+                
+                      <FormButton
+                        action={rejectRecommendationAction}
+                        radarId={radar.id}
+                        itemId={recommendation.id}
+                        variant="danger"
+                      >
+                        拒绝
+                      </FormButton>
+                    </>
+                  ) : null}
+                
+                  {recommendation.status === "ACCEPTED" ? (
+                    <FormButton
+                      action={completeRecommendationAction}
+                      radarId={radar.id}
+                      itemId={recommendation.id}
+                      variant="primary"
+                    >
+                      标记完成
+                    </FormButton>
+                  ) : null}
+                
+                  {recommendation.status !== "REJECTED" && recommendation.status !== "DONE" ? (
+                    <Link
+                      className="rounded-full border border-cyan-300/40 bg-cyan-300/15 px-4 py-2 text-xs font-medium text-cyan-100 transition hover:bg-cyan-300/25"
+                      href={`/radars/${radar.id}/pocs/new?recommendationId=${recommendation.id}`}
+                    >
+                      创建 PoC
+                    </Link>
+                  ) : null}
+                
                   <Link
                     className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-medium text-slate-200 transition hover:bg-white/10"
                     href={`/radars/${radar.id}/pocs`}
