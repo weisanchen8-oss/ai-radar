@@ -4,13 +4,13 @@ import { RadarTopNav, type RadarNavKey } from "@/components/radar/radar-top-nav"
 
 type RadarAppShellProps = {
   activeKey?: RadarNavKey;
-  children: React.ReactNode;
+  children: ReactNode;
 };
 
 export function RadarAppShell({ activeKey, children }: RadarAppShellProps) {
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.18),transparent_28%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.12),transparent_24%),linear-gradient(180deg,#020617_0%,#0f172a_48%,#111827_100%)] px-6 py-8 md:px-10">
-      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+    <main className="min-h-screen bg-[#EEF0EC] px-4 py-6 text-[#101510] md:px-8 md:py-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-8">
         <RadarTopNav activeKey={activeKey} />
         {children}
       </div>
